@@ -120,17 +120,43 @@ jobs:
             const sha = 'main-next-${{needs.dequeue.outputs.SHA}}';
             const author = '${{needs.dequeue.outputs.AUTHOR}}';
             const description = `
-              ## Main-next integrate PR
+            ## Main-next integrate PR
 
-              The aim of this pull request is to sync main and next branch. The expectation from the assignee is as follows:
+            The aim of this pull request is to sync main and next branch. The expectation from the assignee is as follows:
 
-              > - Acknowledge the pull request by adding a comment -- "Actively working on it".
-              > - Resolve any merge conflicts between this branch and next (and push the resolution to this branch). Merge next into this branch if needed. **Do NOT rebase or squash this branch: its history must be preserved**.
-              > - Ensure CI is passing for this PR, fixing any issues. Please don't look into resolving **Real service e2e test** and **Stress test** failures as they are **non-required** CI failures.
-              > - Once the PR is ready for merge, please add a comment @mentioning the reviewers to get this PR merged in. Thank you!!
+            > - Acknowledge the pull request by commenting, "Actively working on it."
+            > - Resolve any merge conflicts between this branch and next, and then push the resolution to this branch. Merge next into this branch if necessary. The history of this branch should not be rebased or squashed.
+            > - This branch exists across the Microsoft main repository, not across anyone's fork.
+            > - There should only be one fix up commit on this branch, named "Automation: Main Next Integrate."
+            > - Verify that CI is passing for this PR, fixing any issues. Do not attempt to resolve Real service e2e test or Stress test failures, as they are non-required CI failures.
+            > - Once the PR is ready for merging, add a comment @mentioning the reviewers to get it merged. Thank you!
 
-              For more information about how to resolve merge conflicts and CI failures, visit [this wiki page]
-              (https://github.com/microsoft/FluidFramework/wiki/Main-next-Automation).`;
+            For more information about how to resolve merge conflicts and CI failures, visit [this wiki page](https://github.com/microsoft/FluidFramework/wiki/Main-next-Automation).
+
+             ### We recommend the following commands while working on this PR:
+
+             Pull this branch locally, and do not work on your forked branch. You will need to work across the Microsoft main repository.
+
+                          git clone https://github.com/microsoft/FluidFramework
+                          git fetch
+                          git checkout <main-next-****>
+
+            If this is the first commit made by you or someone else, fix any merge conflicts or CI failures as follows:
+
+                          git merge next
+                          [Resolve conflicts or known CI failures]
+                          git add .
+                          git commit -m "Automation: Main Next Integrate"
+                          git push
+
+            To add future fix up commits to this PR, use the following commands:
+
+                          [Make desired changes]
+                          git add .
+                          git commit --amend
+                          [Press Esc and then :wq!]
+                          git push --force-with-lease
+              `;
             const octokit = new Octokit({ auth: token })
             const newPr = await octokit.request('POST /repos/{owner}/{repo}/pulls', {
               owner: 'microsoft',
