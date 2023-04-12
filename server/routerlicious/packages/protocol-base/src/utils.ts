@@ -6,6 +6,8 @@
 import { MessageType } from "@fluidframework/protocol-definitions";
 
 /**
+ * @deprecated Moved to `@fluidframework/server-services-client`. Not used in client packages
+ *
  * Check if the string is a service message type, which includes
  * MessageType.ClientJoin, MessageType.ClientLeave, MessageType.Control,
  * MessageType.NoClient, MessageType.SummaryAck, and MessageType.SummaryNack

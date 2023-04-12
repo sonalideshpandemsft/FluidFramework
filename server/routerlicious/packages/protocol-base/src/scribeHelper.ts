@@ -90,6 +90,9 @@ export function mergeAppAndProtocolTree(
 	return newTreeEntries;
 }
 
+/**
+ * @deprecated Moved to `@fluidframework/server-services-client`. It is not part of client packages
+ */
 export function generateServiceProtocolEntries(deli: string, scribe: string): ITreeEntry[] {
 	const serviceProtocolEntries: ITreeEntry[] = [
 		{

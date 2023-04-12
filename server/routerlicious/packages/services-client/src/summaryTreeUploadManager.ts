@@ -11,6 +11,7 @@ import {
 	unreachableCase,
 } from "@fluidframework/common-utils";
 import { ICreateTreeEntry } from "@fluidframework/gitresources";
+// import from services-client in next release
 import { getGitMode, getGitType } from "@fluidframework/protocol-base";
 import {
 	ISnapshotTreeEx,

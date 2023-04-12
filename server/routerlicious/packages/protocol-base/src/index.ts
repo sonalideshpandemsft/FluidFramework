@@ -8,7 +8,6 @@ export {
 	AttachmentTreeEntry,
 	BlobTreeEntry,
 	buildHierarchy,
-	getGitMode,
 	getGitType,
 	TreeTreeEntry,
 } from "./blobs";

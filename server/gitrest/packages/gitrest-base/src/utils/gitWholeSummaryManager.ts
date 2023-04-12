@@ -11,6 +11,7 @@ import {
 	IRef,
 	ITreeEntry,
 } from "@fluidframework/gitresources";
+// import from services-client in next release
 import { getGitMode, getGitType } from "@fluidframework/protocol-base";
 import { SummaryObject, SummaryType } from "@fluidframework/protocol-definitions";
 import {

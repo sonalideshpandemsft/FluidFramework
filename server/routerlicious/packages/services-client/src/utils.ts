@@ -3,7 +3,17 @@
  * Licensed under the MIT License.
  */
 
+import { unreachableCase } from "@fluidframework/common-utils";
 import * as resources from "@fluidframework/gitresources";
+import {
+	FileMode,
+	ISnapshotTreeEx,
+	ITreeEntry,
+	MessageType,
+	SummaryObject,
+	SummaryType,
+	TreeEntry,
+} from "@fluidframework/protocol-definitions";
 import Axios, { AxiosRequestHeaders } from "axios";
 
 export async function getOrCreateRepository(
@@ -35,6 +45,128 @@ export async function getOrCreateRepository(
 }
 
 /**
+ * Take a summary object and returns its git mode.
+ *
+ * @param value - summary object
+ * @returns the git mode of summary object
+ */
+export function getGitMode(value: SummaryObject): string {
+	const type = value.type === SummaryType.Handle ? value.handleType : value.type;
+	switch (type) {
+		case SummaryType.Blob:
+		case SummaryType.Attachment:
+			return FileMode.File;
+		case SummaryType.Tree:
+			return FileMode.Directory;
+		default:
+			unreachableCase(type, `Unknown type: ${type}`);
+	}
+}
+
+/**
  * getRandomInt is not and should not be used as part of any secure random number generation
  */
 export const getRandomInt = (range: number) => Math.floor(Math.random() * range);
+
+/**
+ * Take a summary object and returns its type.
+ *
+ * @param value - summary object
+ * @returns the type of summary object
+ */
+export function getGitType(value: SummaryObject): "blob" | "tree" {
+	const type = value.type === SummaryType.Handle ? value.handleType : value.type;
+
+	switch (type) {
+		case SummaryType.Blob:
+		case SummaryType.Attachment:
+			return "blob";
+		case SummaryType.Tree:
+			return "tree";
+		default:
+			unreachableCase(type, `Unknown type: ${type}`);
+	}
+}
+
+/**
+ * Build a tree hierarchy base on a flat tree
+ *
+ * @param flatTree - a flat tree
+ * @param blobsShaToPathCache - Map with blobs sha as keys and values as path of the blob.
+ * @param removeAppTreePrefix - Remove `.app/` from beginning of paths when present
+ * @returns the hierarchical tree
+ */
+export function buildHierarchyOld(
+	flatTree: resources.ITree,
+	blobsShaToPathCache: Map<string, string> = new Map<string, string>(),
+	removeAppTreePrefix = false,
+): ISnapshotTreeEx {
+	const lookup: { [path: string]: ISnapshotTreeEx } = {};
+	const root: ISnapshotTreeEx = { id: flatTree.sha, blobs: {}, trees: {} };
+	lookup[""] = root;
+
+	for (const entry of flatTree.tree) {
+		const entryPath = removeAppTreePrefix ? entry.path.replace(/^\.app\//, "") : entry.path;
+		const lastIndex = entryPath.lastIndexOf("/");
+		const entryPathDir = entryPath.slice(0, Math.max(0, lastIndex));
+		const entryPathBase = entryPath.slice(lastIndex + 1);
+
+		// The flat output is breadth-first so we can assume we see tree nodes prior to their contents
+		const node = lookup[entryPathDir];
+
+		// Add in either the blob or tree
+		if (entry.type === "tree") {
+			const newTree = { id: entry.sha, blobs: {}, commits: {}, trees: {} };
+			node.trees[decodeURIComponent(entryPathBase)] = newTree;
+			lookup[entryPath] = newTree;
+		} else if (entry.type === "blob") {
+			node.blobs[decodeURIComponent(entryPathBase)] = entry.sha;
+			blobsShaToPathCache.set(entry.sha, `/${entryPath}`);
+		} else {
+			throw new Error("Unknown entry type!!");
+		}
+	}
+
+	return root;
+}
+
+/**
+ * Check if the string is a service message type, which includes
+ * MessageType.ClientJoin, MessageType.ClientLeave, MessageType.Control,
+ * MessageType.NoClient, MessageType.SummaryAck, and MessageType.SummaryNack
+ *
+ * @param type - the type to check
+ * @returns true if it is a system message type
+ */
+export const isServiceMessageType = (type: string) =>
+	type === MessageType.ClientJoin ||
+	type === MessageType.ClientLeave ||
+	type === MessageType.Control ||
+	type === MessageType.NoClient ||
+	type === MessageType.SummaryAck ||
+	type === MessageType.SummaryNack;
+
+export function generateServiceProtocolEntries(deli: string, scribe: string): ITreeEntry[] {
+	const serviceProtocolEntries: ITreeEntry[] = [
+		{
+			mode: FileMode.File,
+			path: "deli",
+			type: TreeEntry.Blob,
+			value: {
+				contents: deli,
+				encoding: "utf-8",
+			},
+		},
+	];
+
+	serviceProtocolEntries.push({
+		mode: FileMode.File,
+		path: "scribe",
+		type: TreeEntry.Blob,
+		value: {
+			contents: scribe,
+			encoding: "utf-8",
+		},
+	});
+	return serviceProtocolEntries;
+}

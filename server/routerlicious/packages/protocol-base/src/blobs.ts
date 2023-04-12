@@ -15,7 +15,10 @@ import {
 	SummaryObject,
 } from "@fluidframework/protocol-definitions";
 import { unreachableCase } from "@fluidframework/common-utils";
+
 /**
+ * @deprecated Moved to `@fluidframework/server-services-client` as part of decoupling client and server packages
+ *
  * Take a summary object and returns its git mode.
  *
  * @param value - summary object
@@ -35,6 +38,7 @@ export function getGitMode(value: SummaryObject): string {
 }
 
 /**
+ * @deprecated Moved to `@fluidframework/server-services-client` as part of decoupling client and server packages
  * Take a summary object and returns its type.
  *
  * @param value - summary object
@@ -55,6 +59,8 @@ export function getGitType(value: SummaryObject): "blob" | "tree" {
 }
 
 /**
+ * @deprecated Moved to `@fluidframework/server-services-client` as part of decoupling client and server packages
+ *
  * Build a tree hierarchy base on a flat tree
  *
  * @param flatTree - a flat tree

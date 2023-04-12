@@ -9,6 +9,7 @@ import {
 	Uint8ArrayToString,
 	unreachableCase,
 } from "@fluidframework/common-utils";
+// import from services-client in next release
 import { getGitType } from "@fluidframework/protocol-base";
 import { ISnapshotTree, SummaryType } from "@fluidframework/protocol-definitions";
 import {
