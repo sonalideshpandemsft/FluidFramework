@@ -1,0 +1,4 @@
+packages:
+  - "routerlicious/packages/**"
+  - "historian/packages/**"
+  - "gitrest/packages/**"
