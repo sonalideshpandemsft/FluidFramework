@@ -1,0 +1,26 @@
+name: Bump Versions
+
+# Run this workflow every time a new manifest file is uploaded to a GitHub release or when a pre-release is created
+on:
+  release:
+    types:
+      - published
+      - prereleased
+
+jobs:
+  build:
+    name: Call Azure Pipeline
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set Version Number
+        id: version
+        run: echo "::set-output name=version::${{ github.event.release.tag_name }}"
+
+      - name: Azure Pipelines Action
+        uses: Azure/pipelines@v1
+        with:
+          azure-devops-project-url: https://dev.azure.com/organization/project-name
+          azure-pipeline-name: 'My Pipeline'
+          azure-devops-token: ${{ secrets.AZURE_DEVOPS_TOKEN }}
+          variables: |
+            version=${{ steps.version.outputs.version }}
