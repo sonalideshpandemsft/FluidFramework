@@ -81,6 +81,7 @@ export default class MergeBranch extends BaseCommand<typeof MergeBranch> {
 		}
 
 		const repoURL = await this.gitRepo.gitClient.raw(["config", "--get", "remote.origin.url"]);
+		console.log("URL----", repoURL);
 
 		const match = repoURL.match(/github\.com\/([^/]+)\/([^/]+)/i);
 
@@ -90,7 +91,7 @@ export default class MergeBranch extends BaseCommand<typeof MergeBranch> {
 				? { owner: match[1], repo: match[2] }
 				: this.error(`Empty owner and repository name`, { exit: -1 });
 
-		this.log(`owner: ${github.owner} and repo: ${github.repo}`);
+		console.log(`owner: ${github.owner} and repo: ${github.repo}`);
 
 		// eslint-disable-next-line unicorn/no-await-expression-member
 		this.initialBranch = (await this.gitRepo.gitClient.status()).current ?? "main";
@@ -113,6 +114,7 @@ export default class MergeBranch extends BaseCommand<typeof MergeBranch> {
 			// TODO: notify the author
 		}
 
+		console.log(`initialBranch 3: ${this.initialBranch}`);
 		const lastMergedCommit = await this.gitRepo.getMergeBase(flags.source, flags.target);
 		this.log(
 			`${lastMergedCommit} is the last merged commit id between ${flags.source} and ${flags.target}`,
@@ -123,7 +125,12 @@ export default class MergeBranch extends BaseCommand<typeof MergeBranch> {
 			`refs/remotes/${this.remote}/${flags.source}`,
 		);
 
+		console.log("unmergedCommitList:", unmergedCommitList);
+
 		if (unmergedCommitList.length === 0) {
+			console.log(
+				`${flags.source} and ${flags.target} branches are in sync. No commits to merge`,
+			);
 			this.log(
 				chalk.green(
 					`${flags.source} and ${flags.target} branches are in sync. No commits to merge`,
@@ -135,21 +142,34 @@ export default class MergeBranch extends BaseCommand<typeof MergeBranch> {
 		this.log(
 			`There are ${unmergedCommitList.length} unmerged commits between the ${flags.source} and ${flags.target} branches`,
 		);
+		console.log(
+			`There are ${unmergedCommitList.length} unmerged commits between the ${flags.source} and ${flags.target} branches`,
+		);
 
 		const commitSize = Math.min(flags.batchSize, unmergedCommitList.length);
 		// `tempBranchToCheckConflicts` is used to check the conflicts of each commit with the target branch.
 		const tempBranchToCheckConflicts = `${flags.target}-automation`;
 		this.branchesToCleanup.push(tempBranchToCheckConflicts);
 
-		await this.gitRepo.gitClient
-			.checkoutBranch(tempBranchToCheckConflicts, flags.target)
-			.push(this.remote, tempBranchToCheckConflicts)
-			.branch(["--set-upstream-to", `${this.remote}/${tempBranchToCheckConflicts}`]);
+		console.log(`commit size: ${commitSize} and temp branch: ${tempBranchToCheckConflicts}`);
+
+		try {
+			await this.gitRepo.gitClient
+				.checkoutBranch(tempBranchToCheckConflicts, flags.target)
+				.push(this.remote, tempBranchToCheckConflicts)
+				.branch(["--set-upstream-to", `${this.remote}/${tempBranchToCheckConflicts}`]);
+		} catch (error: unknown) {
+			console.log("ERROR----", error);
+		}
+		console.log("branch pushed");
 
 		const [commitListHasConflicts, conflictingCommitIndex] = await hasConflicts(
 			unmergedCommitList.slice(0, commitSize),
 			this.gitRepo,
 			this.logger,
+		);
+		this.log(
+			`conflicting commit: ${unmergedCommitList[conflictingCommitIndex]} at index ${conflictingCommitIndex}`,
 		);
 		this.verbose(
 			`conflicting commit: ${unmergedCommitList[conflictingCommitIndex]} at index ${conflictingCommitIndex}`,
@@ -335,6 +355,7 @@ async function hasConflicts(
 	gitRepo: Repository,
 	log?: Logger,
 ): Promise<[boolean, number]> {
+	console.log("has conflicts");
 	for (const [i, commit] of commitIds.entries()) {
 		// eslint-disable-next-line no-await-in-loop
 		const mergesClean = await gitRepo.canMergeWithoutConflicts(commit);
