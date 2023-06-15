@@ -275,7 +275,7 @@ export default class MergeBranch extends BaseCommand<typeof MergeBranch> {
 			this.logger,
 		);
 		console.debug(pr);
-		const author = pr.data?.[0]?.assignee?.login;
+		const author = pr.data?.[0]?.assignee;
 		this.info(
 			`Fetching pull request info for commit id ${prHeadCommit} and assignee ${author}`,
 		);
