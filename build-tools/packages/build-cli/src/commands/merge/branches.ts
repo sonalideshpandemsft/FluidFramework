@@ -79,14 +79,19 @@ export default class MergeBranch extends BaseCommand<typeof MergeBranch> {
 			this.error("gitRepo is undefined", { exit: 1 });
 		}
 
-		const [owner, repo] = context.originRemotePartialUrl.split("/");
+		// const [owner, repo] = context.originRemotePartialUrl.split("/");
+		const owner = "sonalideshpandemsft";
+		const repo = "FluidFramework";
 
 		this.log(`owner: ${owner} and repo: ${repo}`);
 
 		// eslint-disable-next-line unicorn/no-await-expression-member
 		this.initialBranch = (await this.gitRepo.gitClient.status()).current ?? "main";
 
+		this.log(`initial branch: ${this.initialBranch}`);
+
 		this.remote = flags.remote;
+		this.log(`remote: ${this.remote}`);
 		const prExists: boolean = await pullRequestExists(
 			flags.auth,
 			prTitle,
@@ -94,6 +99,8 @@ export default class MergeBranch extends BaseCommand<typeof MergeBranch> {
 			repo,
 			this.logger,
 		);
+
+		this.log(`pr exists: ${prExists}`);
 
 		if (prExists) {
 			this.verbose(`Open pull request exists`);
