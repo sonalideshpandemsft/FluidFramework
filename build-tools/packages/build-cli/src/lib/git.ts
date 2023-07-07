@@ -187,7 +187,7 @@ export class Repository {
 	 * @returns An array of all commits between the base and head commits.
 	 */
 	public async revList(baseCommit: string, headCommit: string = "HEAD"): Promise<string[]> {
-		const result = await this.git.raw("rev-list", `${baseCommit}..${headCommit}`);
+		const result = await this.git.raw("rev-list", `${baseCommit}..${headCommit}`, "--reverse");
 		return result
 			.split(/\r?\n/)
 			.filter((value) => value !== null && value !== undefined && value !== "");
