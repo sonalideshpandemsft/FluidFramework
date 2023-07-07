@@ -203,7 +203,8 @@ export class Repository {
 			await this.git.merge(["--abort"]);
 			console.log(`abort`);
 		} catch (error: any) {
-			throw new Error(error);
+			console.log(`Merge conflicts exists: ${error}`);
+			return false;
 		}
 
 		const canMerge = mergeResult.result === "success";
