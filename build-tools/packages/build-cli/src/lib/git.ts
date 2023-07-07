@@ -204,6 +204,7 @@ export class Repository {
 			console.log(`abort`);
 		} catch (error: any) {
 			console.log(`Merge conflicts exists: ${error}`);
+			await this.git.merge(["--abort"]);
 			return false;
 		}
 
