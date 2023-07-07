@@ -250,8 +250,6 @@ export default class MergeBranch extends BaseCommand<typeof MergeBranch> {
 		this.info(
 			`Fetching pull request info for commit id ${prHeadCommit} and assignee ${author}`,
 		);
-		const user = await getUserAccess(flags.auth, owner, repo, this.logger);
-		this.verbose(`List users with push access to main branch: ${JSON.stringify(user.data)}`);
 
 		const prObject = {
 			token: flags.auth,
@@ -263,6 +261,8 @@ export default class MergeBranch extends BaseCommand<typeof MergeBranch> {
 			title: prTitle,
 			description,
 		};
+
+		this.verbose(`Initiate PR creation: ${prObject}}`);
 
 		const prNumber = await createPullRequest(prObject, this.logger);
 		this.log(
