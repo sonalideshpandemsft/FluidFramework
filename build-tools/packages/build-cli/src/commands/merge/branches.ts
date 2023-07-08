@@ -279,11 +279,13 @@ export default class MergeBranch extends BaseCommand<typeof MergeBranch> {
 			throw err;
 		}
 
-		this.log(`Merge conflicts: ${err.exitCode}`);
 		this.log(`Merge conflicts: ${err.message}`);
-		this.log(`Merge conflicts: ${err.name}`);
-		this.log(`Merge conflicts: ${err.cause}`);
-		this.log(`Merge conflicts: ${err.stack}`);
+		this.log(`Merge conflicts starts with: ${err.message.startsWith("CONFLICTS")}`);
+
+		if (err.message.startsWith("CONFLICTS")) {
+			await this.gitRepo.mergeAbort();
+			return;
+		}
 
 		// Check out the initial branch
 		this.warning(`CLEANUP: checking out initial branch ${this.initialBranch}`);

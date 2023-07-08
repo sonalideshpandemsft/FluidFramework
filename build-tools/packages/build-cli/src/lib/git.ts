@@ -193,6 +193,11 @@ export class Repository {
 			.filter((value) => value !== null && value !== undefined && value !== "");
 	}
 
+	public async mergeAbort() {
+		const abort = await this.git.merge(["abort"]);
+		return abort.result === "success";
+	}
+
 	public async canMergeWithoutConflicts(commit: string): Promise<boolean> {
 		console.log(`canMergeWithoutConflicts: ${commit}`);
 		console.log(`inside try: ${commit}`);
