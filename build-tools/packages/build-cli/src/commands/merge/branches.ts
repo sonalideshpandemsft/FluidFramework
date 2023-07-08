@@ -79,14 +79,19 @@ export default class MergeBranch extends BaseCommand<typeof MergeBranch> {
 			this.error("gitRepo is undefined", { exit: 1 });
 		}
 
-		const [owner, repo] = context.originRemotePartialUrl.split("/");
+		// const [owner, repo] = context.originRemotePartialUrl.split("/");
+		const owner = "sonalideshpandemsft";
+		const repo = "FluidFramework";
 
 		this.log(`owner: ${owner} and repo: ${repo}`);
 
 		// eslint-disable-next-line unicorn/no-await-expression-member
 		this.initialBranch = (await this.gitRepo.gitClient.status()).current ?? "main";
 
+		this.log(`initial branch: ${this.initialBranch}`);
+
 		this.remote = flags.remote;
+		this.log(`remote: ${this.remote}`);
 		const prExists: boolean = await pullRequestExists(
 			flags.auth,
 			prTitle,
@@ -95,6 +100,7 @@ export default class MergeBranch extends BaseCommand<typeof MergeBranch> {
 			this.logger,
 		);
 
+		this.log(`prExists: ${prExists}`);
 		if (prExists) {
 			this.verbose(`Open pull request exists`);
 			this.exit(-1);
@@ -111,6 +117,8 @@ export default class MergeBranch extends BaseCommand<typeof MergeBranch> {
 			lastMergedCommit,
 			`refs/remotes/${this.remote}/${flags.source}`,
 		);
+
+		this.log(`Unmerged commit list: ${unmergedCommitList}`);
 
 		if (unmergedCommitList.length === 0) {
 			this.log(
@@ -242,8 +250,6 @@ export default class MergeBranch extends BaseCommand<typeof MergeBranch> {
 		this.info(
 			`Fetching pull request info for commit id ${prHeadCommit} and assignee ${author}`,
 		);
-		const user = await getUserAccess(flags.auth, owner, repo, this.logger);
-		this.verbose(`List users with push access to main branch: ${JSON.stringify(user.data)}`);
 
 		const prObject = {
 			token: flags.auth,
@@ -256,49 +262,12 @@ export default class MergeBranch extends BaseCommand<typeof MergeBranch> {
 			description,
 		};
 
+		this.log(`Initiate PR creation: ${prObject}}`);
+
 		const prNumber = await createPullRequest(prObject, this.logger);
 		this.log(
 			`Opened pull request ${prNumber} for commit id ${prHeadCommit}. Please resolve the merge conflicts.`,
 		);
-	}
-
-	/**
-	 * This method is called when an unhandled exception is thrown, or when the command exits with an error code. if
-	 * possible, this code cleans up the temporary branches that were created. It cleans up both local and remote
-	 * branches.
-	 */
-	protected override async catch(err: Error & { exitCode?: number | undefined }): Promise<any> {
-		if (this.gitRepo === undefined) {
-			throw err;
-		}
-
-		// Check out the initial branch
-		this.warning(`CLEANUP: checking out initial branch ${this.initialBranch}`);
-		await this.gitRepo.gitClient.checkout(this.initialBranch);
-
-		// Delete the branches we created
-		this.warning(`CLEANUP: Deleting local branches: ${this.branchesToCleanup.join(", ")}`);
-		await this.gitRepo.gitClient.deleteLocalBranches(
-			this.branchesToCleanup,
-			true /* forceDelete */,
-		);
-
-		// Delete the remote branches we created
-		const promises: Promise<unknown>[] = [];
-		// eslint-disable-next-line unicorn/consistent-function-scoping
-		const deleteFunc = async (branch: string) => {
-			this.warning(`CLEANUP: Deleting remote branch ${this.remote}/${branch}`);
-			try {
-				await this.gitRepo?.gitClient.push(this.remote, branch, ["--delete"]);
-			} catch {
-				this.verbose(`CLEANUP: FAILED to delete remote branch ${this.remote}/${branch}`);
-			}
-		};
-		for (const branch of this.branchesToCleanup) {
-			promises.push(deleteFunc(branch));
-		}
-		await Promise.all(promises);
-		throw err;
 	}
 }
 
@@ -318,9 +287,11 @@ async function hasConflicts(
 	gitRepo: Repository,
 	log?: Logger,
 ): Promise<[boolean, number]> {
+	log?.log(`hasConflicts`);
 	for (const [i, commit] of commitIds.entries()) {
 		// eslint-disable-next-line no-await-in-loop
 		const mergesClean = await gitRepo.canMergeWithoutConflicts(commit);
+		log?.log(`hasConflicts mergesClean-----------------------${mergesClean}`);
 		log?.verbose(`Can merge without conflicts ${commit}: ${mergesClean}`);
 		if (mergesClean === false) {
 			return [true, i];
