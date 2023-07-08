@@ -123,8 +123,8 @@ export async function createPullRequest(
 		owner: pr.owner,
 		repo: pr.repo,
 		pull_number: newPr.data.number,
-		reviewers: ["sonalideshpandemsft"],
-		team_reviewers: ["sonalideshpandemsft"],
+		reviewers: [""],
+		team_reviewers: [""],
 	});
 
 	log.log(`Adding label to pull request ${newPr.data.number}`);
