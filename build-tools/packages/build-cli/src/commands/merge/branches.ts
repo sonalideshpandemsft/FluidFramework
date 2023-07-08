@@ -262,52 +262,13 @@ export default class MergeBranch extends BaseCommand<typeof MergeBranch> {
 			description,
 		};
 
-		this.verbose(`Initiate PR creation: ${prObject}}`);
+		this.log(`Initiate PR creation: ${prObject}}`);
 
 		const prNumber = await createPullRequest(prObject, this.logger);
 		this.log(
 			`Opened pull request ${prNumber} for commit id ${prHeadCommit}. Please resolve the merge conflicts.`,
 		);
 	}
-
-	/**
-	 * This method is called when an unhandled exception is thrown, or when the command exits with an error code. if
-	 * possible, this code cleans up the temporary branches that were created. It cleans up both local and remote
-	 * branches.
-	 */
-	// protected override async catch(err: Error & { exitCode?: number | undefined }): Promise<any> {
-	// 	if (this.gitRepo === undefined) {
-	// 		throw err;
-	// 	}
-
-	// 	// Check out the initial branch
-	// 	this.warning(`CLEANUP: checking out initial branch ${this.initialBranch}`);
-	// 	await this.gitRepo.gitClient.checkout(this.initialBranch);
-
-	// 	// Delete the branches we created
-	// 	this.warning(`CLEANUP: Deleting local branches: ${this.branchesToCleanup.join(", ")}`);
-	// 	await this.gitRepo.gitClient.deleteLocalBranches(
-	// 		this.branchesToCleanup,
-	// 		true /* forceDelete */,
-	// 	);
-
-	// 	// Delete the remote branches we created
-	// 	const promises: Promise<unknown>[] = [];
-	// 	// eslint-disable-next-line unicorn/consistent-function-scoping
-	// 	const deleteFunc = async (branch: string) => {
-	// 		this.warning(`CLEANUP: Deleting remote branch ${this.remote}/${branch}`);
-	// 		try {
-	// 			await this.gitRepo?.gitClient.push(this.remote, branch, ["--delete"]);
-	// 		} catch {
-	// 			this.verbose(`CLEANUP: FAILED to delete remote branch ${this.remote}/${branch}`);
-	// 		}
-	// 	};
-	// 	for (const branch of this.branchesToCleanup) {
-	// 		promises.push(deleteFunc(branch));
-	// 	}
-	// 	await Promise.all(promises);
-	// 	throw err;
-	// }
 }
 
 /**

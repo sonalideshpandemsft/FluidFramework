@@ -99,7 +99,7 @@ export async function createPullRequest(
 	},
 	log: CommandLogger,
 ): Promise<any> {
-	log.verbose(`Creating a pull request---------------`);
+	log.log(`Creating a pull request---------------`);
 	const octokit = new Octokit({ auth: pr.token });
 	const newPr = await octokit.request(PULL_REQUEST, {
 		owner: pr.owner,
@@ -110,7 +110,7 @@ export async function createPullRequest(
 		base: pr.target,
 	});
 
-	log.verbose(`Assigning ${pr.assignee} to pull request ${newPr.data.number}`);
+	log.log(`Assigning ${pr.assignee} to pull request ${newPr.data.number}`);
 	await octokit.request(ASSIGNEE, {
 		owner: pr.owner,
 		repo: pr.repo,
@@ -118,7 +118,7 @@ export async function createPullRequest(
 		assignees: [pr.assignee],
 	});
 
-	log.verbose(`Adding reviewer to pull request ${newPr.data.number}`);
+	log.log(`Adding reviewer to pull request ${newPr.data.number}`);
 	await octokit.request(REVIEWER, {
 		owner: pr.owner,
 		repo: pr.repo,
@@ -126,7 +126,7 @@ export async function createPullRequest(
 		reviewer: [],
 	});
 
-	log.verbose(`Adding label to pull request ${newPr.data.number}`);
+	log.log(`Adding label to pull request ${newPr.data.number}`);
 	await octokit.request(LABEL, {
 		owner: pr.owner,
 		repo: pr.repo,
