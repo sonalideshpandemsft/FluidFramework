@@ -187,16 +187,27 @@ export class Repository {
 	 * @returns An array of all commits between the base and head commits.
 	 */
 	public async revList(baseCommit: string, headCommit: string = "HEAD"): Promise<string[]> {
-		const result = await this.git.raw("rev-list", `${baseCommit}..${headCommit}`);
+		const result = await this.git.raw("rev-list", `${baseCommit}..${headCommit}`, "--reverse");
 		return result
 			.split(/\r?\n/)
 			.filter((value) => value !== null && value !== undefined && value !== "");
 	}
 
+	public async mergeAbort() {
+		const abort = await this.git.merge(["abort"]);
+		return abort.result === "success";
+	}
+
 	public async canMergeWithoutConflicts(commit: string): Promise<boolean> {
-		const mergeResult = await this.git.merge([commit, "--no-commit"]);
+		console.log(`canMergeWithoutConflicts: ${commit}`);
+		console.log(`inside try: ${commit}`);
+		const mergeResult = await this.git.merge([commit, "--no-commit", "--no-ff"]);
+		console.log(`merge result: ${mergeResult}`);
 		await this.git.merge(["--abort"]);
+		console.log(`abort`);
+
 		const canMerge = mergeResult.result === "success";
+		console.log(`can merge: ${mergeResult.result}`);
 		return canMerge;
 	}
 }
