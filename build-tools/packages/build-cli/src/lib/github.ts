@@ -9,8 +9,8 @@ const PULL_REQUEST_EXISTS = "GET /repos/{owner}/{repo}/pulls";
 const PULL_REQUEST_INFO = "GET /repos/{owner}/{repo}/commits/{commit_sha}/pulls";
 const PULL_REQUEST = "POST /repos/{owner}/{repo}/pulls";
 const ASSIGNEE = "POST /repos/{owner}/{repo}/issues/{issue_number}/assignees";
-const REVIEWER = "POST /repos/{owner}/{repo}/pulls/{pull_number}/requested_reviewers";
-const LABEL = "POST /repos/{owner}/{repo}/issues/{issue_number}/labels";
+// const REVIEWER = "POST /repos/{owner}/{repo}/pulls/{pull_number}/requested_reviewers";
+// const LABEL = "POST /repos/{owner}/{repo}/issues/{issue_number}/labels";
 const GET_USER = "GET /repos/{owner}/{repo}/branches/{branch}/protection/restrictions/users";
 
 /**
@@ -99,7 +99,7 @@ export async function createPullRequest(
 	},
 	log: CommandLogger,
 ): Promise<any> {
-	log.verbose(`Creating a pull request---------------`);
+	log.log(`Creating a pull request---------------`);
 	const octokit = new Octokit({ auth: pr.token });
 	const newPr = await octokit.request(PULL_REQUEST, {
 		owner: pr.owner,
@@ -110,7 +110,7 @@ export async function createPullRequest(
 		base: pr.target,
 	});
 
-	log.verbose(`Assigning ${pr.assignee} to pull request ${newPr.data.number}`);
+	log.log(`Assigning ${pr.assignee} to pull request ${newPr.data.number}`);
 	await octokit.request(ASSIGNEE, {
 		owner: pr.owner,
 		repo: pr.repo,
@@ -118,21 +118,22 @@ export async function createPullRequest(
 		assignees: [pr.assignee],
 	});
 
-	log.verbose(`Adding reviewer to pull request ${newPr.data.number}`);
-	await octokit.request(REVIEWER, {
-		owner: pr.owner,
-		repo: pr.repo,
-		pull_number: newPr.data.number,
-		reviewer: [],
-	});
+	log.log(`Adding reviewer to pull request ${newPr.data.number}`);
+	// await octokit.request(REVIEWER, {
+	// 	owner: pr.owner,
+	// 	repo: pr.repo,
+	// 	pull_number: newPr.data.number,
+	// 	reviewers: [""],
+	// 	team_reviewers: [""],
+	// });
 
-	log.verbose(`Adding label to pull request ${newPr.data.number}`);
-	await octokit.request(LABEL, {
-		owner: pr.owner,
-		repo: pr.repo,
-		issue_number: newPr.data.number,
-		labels: ["main-next-integrate", "do-not-squash-merge"],
-	});
+	log.log(`Adding label to pull request ${newPr.data.number}`);
+	// await octokit.request(LABEL, {
+	// 	owner: pr.owner,
+	// 	repo: pr.repo,
+	// 	issue_number: newPr.data.number,
+	// 	labels: ["main-next-integrate", "do-not-squash-merge"],
+	// });
 
 	return newPr.data.number;
 }
