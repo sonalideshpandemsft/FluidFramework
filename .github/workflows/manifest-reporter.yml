@@ -1,0 +1,35 @@
+name: Check New Manifest Files
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  check_manifest:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Check for New Manifest Files
+        run: |
+          # Fetch release information using GitHub API
+          release_info=$(curl -s "https://api.github.com/repos/microsoft/FluidFramework/releases/latest")
+
+          # Extract the creation date of the release in UTC format
+          creation_date=$(echo "$release_info" | jq -r '.created_at')
+
+          # Get the current time in UTC
+          current_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+          # Calculate the time difference in seconds
+          time_diff=$(( $(date -u -d "$current_time" +%s) - $(date -u -d "$creation_date" +%s) ))
+
+          # Check if the manifest was uploaded within the last 24 hours (86400 seconds)
+          if [ $time_diff -lt 86400 ]; then
+            echo "New manifest files were uploaded within the last 24 hours."
+            # Add your desired actions here, such as downloading the manifest files or triggering further steps.
+          else
+            echo "No new manifest files were uploaded within the last 24 hours."
+          fi
