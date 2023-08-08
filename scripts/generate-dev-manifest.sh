@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# echo SETVERSION_VERSION=$SETVERSION_VERSION 
+echo SETVERSION_VERSION=$SETVERSION_VERSION 
 
 # Fetch releases using GitHub API
 releases=$(curl -s "https://api.github.com/repos/microsoft/FluidFramework/releases")
@@ -24,7 +24,7 @@ if [ -n "$manifest_url_simple" ]; then
   manifest_filename=$(basename "$manifest_url_simple")
 
   # Modify the downloaded manifest file using jq
-  jq 'to_entries | map(if .value | contains("internal") then . + {value: "2.0.0-dev.5.3.2.178189"} else . end) | from_entries' "$manifest_filename" > temp.json && mv temp.json "$manifest_filename"
+  jq 'to_entries | map(if .value | contains("internal") then . + {value: $SETVERSION_VERSION} else . end) | from_entries' "$manifest_filename" > temp.json && mv temp.json "$manifest_filename"
   
   echo "Manifest modified successfully."
 
