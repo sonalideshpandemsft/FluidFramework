@@ -27,6 +27,9 @@ if [ -n "$manifest_url_simple" ]; then
   jq 'to_entries | map(if .value | contains("internal") then . + {value: "2.0.0-dev.5.3.2.178189"} else . end) | from_entries' "$manifest_filename" > temp.json && mv temp.json "$manifest_filename"
   
   echo "Manifest modified successfully."
+
+  # Upload simple.json and caret.json manifest files to azure blob
+
 else
   echo "No matching internal manifest file found."
 fi
