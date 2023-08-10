@@ -107,7 +107,7 @@ steps:
       flub generate buildVersion
 
 - task: Bash@3
-  displayName: Upload Scheduled dev Manifest Files
+  displayName: Upload Dev Manifest Files
   env:
     VERSION_RELEASE: $(release)
     RELEASE_GROUP: ${{ parameters.tagName }}
@@ -117,8 +117,7 @@ steps:
     workingDirectory: ${{ parameters.buildDirectory }}
     filePath: $(Build.SourcesDirectory)/scripts/generate-dev-manifest.sh
   condition: |
-    and(eq(variables['Build.Reason'], 'Schedule'), contains(variables['VERSION_RELEASE'], 'dev'))
-
+    and(eq(variables['Build.Reason'], 'Schedule'), eq(variables['VERSION_RELEASE'], 'prerelease'), eq(variables['VERSION_INCLUDE_INTERNAL_VERSIONS'], 'False'))
 
 - task: Bash@3
   displayName: Update Package Version (flub)

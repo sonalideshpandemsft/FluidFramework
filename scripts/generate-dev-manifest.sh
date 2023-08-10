@@ -29,7 +29,7 @@ if [ -n "$manifest_url_caret" ]; then
 
   echo "Manifest modified successfully."
 
-  # Upload simple.json and caret.json manifest files to azure blob
+  # Upload caret.json manifest files to azure blob
 
 else
   echo "No matching internal manifest file found."
