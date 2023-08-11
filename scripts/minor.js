@@ -1,5 +1,14 @@
+/**
+ * Copyright (c) Microsoft Corporation and contributors. All rights reserved.
+ * Licensed under the MIT License.
+ */
+
 const axios = require('axios');
 
+/**
+ * Fetch the most recent minor/patch.
+ * TODO: Modify this function to filter the most recent minor/patch version by date
+ */
 async function fetchReleases() {
   try {
     const response = await axios.get(

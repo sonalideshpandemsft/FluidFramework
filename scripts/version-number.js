@@ -1,3 +1,8 @@
+/**
+ * Copyright (c) Microsoft Corporation and contributors. All rights reserved.
+ * Licensed under the MIT License.
+ */
+
 const axios = require('axios');
 const fs = require('fs');
 
@@ -7,6 +12,10 @@ const REGISTRY_URL = 'https://registry.npmjs.org';
 const DAYS_AGO = new Date(Date.now() - DAYS * 24 * 60 * 60 * 1000).toISOString();
 var VERSION;
 
+
+/**
+ * Fetch the dev version number released in the last 24 hours.
+ */
 axios.get(`${REGISTRY_URL}/${PACKAGE_NAME}`).then(response => {
   const time = response.data.time;
   
@@ -23,7 +32,10 @@ axios.get(`${REGISTRY_URL}/${PACKAGE_NAME}`).then(response => {
   console.error('Error:', error.message);
 });
 
-// Fetch releases using GitHub API
+/**
+ * Fetch the most recent caret manifest file published to GitHub.
+ * Replace the ranges with the dev version number in this manifest file.
+ */
 axios.get('https://api.github.com/repos/microsoft/FluidFramework/releases')
   .then(response => {
     const releases = response.data;
