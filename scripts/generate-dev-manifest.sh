@@ -28,9 +28,6 @@ if [ -n "$manifest_url_caret" ]; then
   jq --arg version "$SETVERSION_VERSION" 'to_entries | map(if .value | contains("internal") then . + {value: $version} else . end) | from_entries' "$new_manifest_filename" > temp.json && mv temp.json "$new_manifest_filename"
 
   echo "Manifest modified successfully."
-
-  # Upload caret.json manifest files to azure blob
-
 else
   echo "No matching internal manifest file found."
 fi
