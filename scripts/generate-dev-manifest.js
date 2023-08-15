@@ -1,10 +1,10 @@
-const axios = require('axios');
+const fetch = require('node-fetch');
 const fs = require('fs');
 
 // Constants
 const PACKAGE_NAME = '@fluidframework/container-runtime';
 const REGISTRY_URL = 'https://pkgs.dev.azure.com/fluidframework/internal/_packaging/build/npm/registry/';
-const ADO_PAT = '<YOUR-ADO-PAT>'; 
+const ADO_PAT = '<YOUR-ADO-PAT>';
 const organization = 'fluidframework';
 const project = 'internal';
 const ADO_BASE_URL = `https://dev.azure.com/${organization}/${project}/_apis/build/builds?api-version=7.0`;
@@ -19,12 +19,13 @@ const authHeader = `Basic ${Buffer.from(`:${ADO_PAT}`).toString('base64')}`;
  */
 async function getFirstSuccessfulBuild() {
   try {
-    const response = await axios.get(ADO_BASE_URL, { headers: { Authorization: authHeader } });
+    const response = await fetch(ADO_BASE_URL, { headers: { Authorization: authHeader } });
+    const data = await response.json();
 
     const twentyFourHoursAgo = new Date();
     twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
 
-    const successfulBuilds = response.data.value.filter(build =>
+    const successfulBuilds = data.value.filter(build =>
       build.definition.name === 'Build - client packages' &&
       build.status === 'completed' &&
       build.result === 'succeeded' &&
@@ -50,8 +51,9 @@ async function getFirstSuccessfulBuild() {
  */
 async function fetchDevVersionNumber(buildNumber) {
   try {
-    const response = await axios.get(`${REGISTRY_URL}/${PACKAGE_NAME}`, { headers: { Authorization: authHeader } });
-    const time = response.data.time;
+    const response = await fetch(`${REGISTRY_URL}/${PACKAGE_NAME}`, { headers: { Authorization: authHeader } });
+    const data = await response.json();
+    const time = data.time;
 
     for (const key in time) {
       if (key.includes(buildNumber)) {
@@ -73,8 +75,8 @@ async function fetchDevVersionNumber(buildNumber) {
  */
 async function generateManifestFile(VERSION) {
   try {
-    const releasesResponse = await axios.get(GITHUB_RELEASE_URL);
-    const releases = releasesResponse.data;
+    const releasesResponse = await fetch(GITHUB_RELEASE_URL);
+    const releases = await releasesResponse.json();
 
     // Find the latest caret.json internal manifest file URL
     const manifestAsset = releases[0].assets.find(asset => asset.name.includes('.caret.json'));
@@ -82,12 +84,12 @@ async function generateManifestFile(VERSION) {
       const manifest_url_caret = manifestAsset.browser_download_url;
       console.log(`Downloading latest internal manifest: ${manifest_url_caret}`);
 
-      const manifestResponse = await axios.get(manifest_url_caret, { responseType: 'arraybuffer' });
-      const manifestData = manifestResponse.data;
+      const manifestResponse = await fetch(manifest_url_caret);
+      const manifestData = await manifestResponse.buffer();
       const manifest_filename = manifest_url_caret.substring(manifest_url_caret.lastIndexOf('/') + 1);
       const new_manifest_filename = `fluid-framework-release-manifest.client.${VERSION}.caret.json`;
 
-      fs.writeFileSync(manifest_filename, Buffer.from(manifestData));
+      fs.writeFileSync(manifest_filename, manifestData);
       fs.renameSync(manifest_filename, new_manifest_filename);
 
       const modifiedManifest = JSON.parse(fs.readFileSync(new_manifest_filename, 'utf-8'));
