@@ -1,51 +1,52 @@
 const axios = require('axios');
 const fs = require('fs');
 
+// Constants
 const PACKAGE_NAME = '@fluidframework/container-runtime';
 const REGISTRY_URL = 'https://pkgs.dev.azure.com/fluidframework/internal/_packaging/build/npm/registry/';
-
 const ADO_PAT = '<YOUR-ADO-PAT>'; 
 const organization = 'fluidframework';
 const project = 'internal';
 const ADO_BASE_URL = `https://dev.azure.com/${organization}/${project}/_apis/build/builds?api-version=7.0`;
-
 const GITHUB_RELEASE_URL = "https://api.github.com/repos/microsoft/FluidFramework/releases";
 
+// Authorization header for Azure DevOps
 const authHeader = `Basic ${Buffer.from(`:${ADO_PAT}`).toString('base64')}`;
-const config = {
-  headers: {
-    Authorization: `Basic ${Buffer.from(`:${ADO_PAT}`).toString('base64')}`,
-  },
-};
-``
+
+/**
+ * Fetches the first successful build number in the last 24 hours.
+ * @returns {string} The build number if successful, otherwise undefined.
+ */
 async function getFirstSuccessfulBuild() {
   try {
-	const response = await axios.get(ADO_BASE_URL, config);
-  const twentyFourHoursAgo = new Date();
-  twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
+    const response = await axios.get(ADO_BASE_URL, { headers: { Authorization: authHeader } });
 
-  const successfulBuilds = response.data.value.filter(build =>
-    build.definition.name === 'Build - client packages' &&
-    build.status === 'completed' &&
-    build.result === 'succeeded' &&
-    build.sourceBranch === 'refs/heads/main' &&
-    new Date(build.finishTime) >= twentyFourHoursAgo
-  );
+    const twentyFourHoursAgo = new Date();
+    twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
 
-  if (successfulBuilds.length > 0) {
-    const successfulBuildNumbers = successfulBuilds.map(build => build.buildNumber);
-    return successfulBuildNumbers[0];
-  } else {
-    return undefined;
-  }
+    const successfulBuilds = response.data.value.filter(build =>
+      build.definition.name === 'Build - client packages' &&
+      build.status === 'completed' &&
+      build.result === 'succeeded' &&
+      build.sourceBranch === 'refs/heads/main' &&
+      new Date(build.finishTime) >= twentyFourHoursAgo
+    );
+
+    if (successfulBuilds.length > 0) {
+      return successfulBuilds[0].buildNumber;
+    } else {
+      return undefined;
+    }
   } catch (error) {
-    console.error('Error:', error.message);
-    return null;
+    console.error('Error fetching successful builds:', error.message);
+    return undefined;
   }
 }
 
 /**
- * Fetch the dev version number released in the last 24 hours.
+ * Fetches the dev version number released in the specified build.
+ * @param {string} buildNumber - The build number.
+ * @returns {string} The dev version number if found, otherwise undefined.
  */
 async function fetchDevVersionNumber(buildNumber) {
   try {
@@ -54,21 +55,21 @@ async function fetchDevVersionNumber(buildNumber) {
 
     for (const key in time) {
       if (key.includes(buildNumber)) {
-        return key; // Return the matching version immediately
+        return key;
       }
     }
 
     console.log(`No version with build number ${buildNumber} found.`);
-    return undefined; // Return undefined if no matching version is found
+    return undefined;
   } catch (error) {
-    console.error('Error:', error.message);
-    return undefined; // Return undefined in case of an error
+    console.error('Error fetching dev version number:', error.message);
+    return undefined;
   }
 }
 
 /**
- * Fetch the most recent caret manifest file published to GitHub.
- * Replace the ranges with the dev version number in this manifest file.
+ * Generates a modified manifest file with the specified version number.
+ * @param {string} VERSION - The version number.
  */
 async function generateManifestFile(VERSION) {
   try {
@@ -102,19 +103,27 @@ async function generateManifestFile(VERSION) {
       console.log('No matching internal manifest file found.');
     }
   } catch (error) {
-    console.error('Error:', error.message);
+    console.error('Error generating manifest file:', error.message);
   }
 }
 
-
+/**
+ * Main function to fetch build details, dev version, and generate manifest.
+ */
 async function main() {
-  const buildId = await getFirstSuccessfulBuild();
-  console.log(`Most successful build number for the last 24 hours: ${buildId}`);
-
-  const devVersion = await fetchDevVersionNumber(buildId);
-  console.log(`Fetch the dev version published to build feed for ${buildId}: ${devVersion}`);
-
-  await generateManifestFile(devVersion);
+  try {
+    const buildNumber = await getFirstSuccessfulBuild();
+    if (buildNumber) {
+      console.log(`Most successful build number for the last 24 hours: ${buildNumber}`);
+      const devVersion = await fetchDevVersionNumber(buildNumber);
+      if (devVersion) {
+        console.log(`Fetched dev version: ${devVersion}`);
+        await generateManifestFile(devVersion);
+      }
+    }
+  } catch (error) {
+    console.error('An error occurred:', error.message);
+  }
 }
 
-main().catch(() => console.error(`Check FF script`));
+main();
