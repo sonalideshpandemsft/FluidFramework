@@ -1,6 +1,6 @@
 # Fluid
 
-TEST-1 TEST4 CHANGE
+TEST-1 TEST4 test CHANGE
 
 The Fluid Framework is a library for building distributed, real-time collaborative web
 applications using JavaScript or TypeScript.
