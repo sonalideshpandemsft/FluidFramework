@@ -11,7 +11,7 @@ import { IEventProvider } from '@fluidframework/core-interfaces';
 import { IEventTransformer } from '@fluidframework/core-interfaces';
 import { TransformedEvent } from '@fluidframework/core-interfaces';
 
-// @internal
+// @public
 export class Buffer extends Uint8Array {
     static from(value: unknown, encodingOrOffset?: unknown, length?: unknown): IsoBuffer;
     // (undocumented)
@@ -55,10 +55,10 @@ export function gitHashFile(file: IsoBuffer): Promise<string>;
 // @internal
 export function hashFile(file: IsoBuffer, algorithm?: "SHA-1" | "SHA-256", hashEncoding?: "hex" | "base64"): Promise<string>;
 
-// @internal (undocumented)
+// @public (undocumented)
 export const IsoBuffer: typeof Buffer;
 
-// @internal (undocumented)
+// @public (undocumented)
 export type IsoBuffer = Buffer;
 
 // @internal

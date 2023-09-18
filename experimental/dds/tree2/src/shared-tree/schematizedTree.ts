@@ -185,7 +185,7 @@ export function schematize(
 /**
  * View Schema for a `SharedTree`.
  *
- * @alpha
+ * @public
  */
 export interface SchemaConfiguration<TRoot extends FieldSchema = FieldSchema> {
 	/**
@@ -197,7 +197,7 @@ export interface SchemaConfiguration<TRoot extends FieldSchema = FieldSchema> {
 /**
  * Content that can populate a `SharedTree`.
  *
- * @alpha
+ * @public
  */
 export interface TreeContent<TRoot extends FieldSchema = FieldSchema>
 	extends SchemaConfiguration<TRoot> {
@@ -214,7 +214,7 @@ export interface TreeContent<TRoot extends FieldSchema = FieldSchema>
 /**
  * Options used to schematize a `SharedTree`.
  *
- * @alpha
+ * @public
  */
 export interface SchematizeConfiguration<TRoot extends FieldSchema = FieldSchema>
 	extends SchemaConfiguration<TRoot> {
@@ -227,7 +227,7 @@ export interface SchematizeConfiguration<TRoot extends FieldSchema = FieldSchema
 /**
  * Options used to initialize (if needed) and schematize a `SharedTree`.
  *
- * @alpha
+ * @public
  */
 export interface InitializeAndSchematizeConfiguration<TRoot extends FieldSchema = FieldSchema>
 	extends TreeContent<TRoot>,

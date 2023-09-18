@@ -774,7 +774,7 @@ export class ModularChangeFamily
 }
 
 /**
- * @alpha
+ * @public
  */
 export function revisionMetadataSourceFromInfo(
 	revInfos: readonly RevisionInfo[],
@@ -844,7 +844,7 @@ function newCrossFieldTable<T>(): CrossFieldTable<T> {
 }
 
 /**
- * @alpha
+ * @public
  */
 interface ConstraintState {
 	violationCount: number;
@@ -1109,7 +1109,7 @@ export class ModularEditBuilder extends EditBuilder<ModularChangeset> {
 }
 
 /**
- * @alpha
+ * @public
  */
 export interface EditDescription {
 	field: FieldUpPath;
