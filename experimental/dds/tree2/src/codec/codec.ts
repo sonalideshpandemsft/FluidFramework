@@ -339,3 +339,13 @@ export type BetaInterface1 = true;
  * @beta
  */
 export type BetaInterface2 = true;
+
+/**
+ * @alpha
+ */
+export type AlphaInterface1 = true;
+
+/**
+ * @alpha
+ */
+export type AlphaInterface2 = true;

@@ -43,6 +43,12 @@ type AllowOptional<T> = [FlattenKeys<RequiredFields<T> & OptionalFields<T>>][_In
 // @public
 type AllowOptionalNotFlattened<T> = [RequiredFields<T> & OptionalFields<T>][_InlineTrick];
 
+// @alpha (undocumented)
+export type AlphaInterface1 = true;
+
+// @alpha (undocumented)
+export type AlphaInterface2 = true;
+
 // @public
 export type Anchor = Brand<number, "rebaser.Anchor">;
 
@@ -140,6 +146,12 @@ export interface BatchBindingContext extends BindingContext {
     // (undocumented)
     readonly type: typeof BindingType.Batch;
 }
+
+// @beta (undocumented)
+export type BetaInterface1 = true;
+
+// @beta (undocumented)
+export type BetaInterface2 = true;
 
 // @public
 export type BinderEventsCompare = CompareFunction<VisitorBindingContext>;

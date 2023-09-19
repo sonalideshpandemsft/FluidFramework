@@ -317,6 +317,10 @@ export type {
 	IMultiFormatCodec,
 	JsonValidator,
 	SchemaValidationFunction,
+	BetaInterface1,
+	BetaInterface2,
+	AlphaInterface1,
+	AlphaInterface2,
 } from "./codec";
 export { noopValidator } from "./codec";
 export { typeboxValidator } from "./external-utilities";

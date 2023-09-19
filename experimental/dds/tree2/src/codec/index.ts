@@ -19,5 +19,7 @@ export {
 	withSchemaValidation,
 	BetaInterface1,
 	BetaInterface2,
+	AlphaInterface1,
+	AlphaInterface2,
 } from "./codec";
 export { noopValidator } from "./noopValidator";
