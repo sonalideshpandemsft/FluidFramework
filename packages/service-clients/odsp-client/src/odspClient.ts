@@ -24,7 +24,6 @@ import {
 import { IClient } from "@fluidframework/protocol-definitions";
 import { Loader } from "@fluidframework/container-loader";
 import {
-	IOdspResolvedUrl,
 	OdspResourceTokenFetchOptions,
 } from "@fluidframework/odsp-driver-definitions";
 import type { ITokenResponse } from "@fluidframework/azure-client";
@@ -35,9 +34,9 @@ import {
 	OdspClientProps,
 	OdspConnectionConfig,
 	OdspContainerServices,
-	OdspContainerAttributes,
 } from "./interfaces";
 import { OdspAudience } from "./odspAudience";
+import { OdspContainerAttributes } from "./odspContainerAttributes";
 
 /**
  * OdspClient provides the ability to have a Fluid object backed by the ODSP service within the context of Microsoft 365 (M365) tenants.
@@ -149,7 +148,7 @@ export class OdspClient {
 		const createNewRequest: IRequest = createOdspCreateContainerRequest(
 			connection.siteUrl,
 			connection.driveId,
-			connection.folderPath,
+			"",
 			uuid(),
 		);
 
@@ -179,20 +178,9 @@ export class OdspClient {
 	}
 
 	private async getContainerServices(container: IContainer): Promise<OdspContainerServices> {
-		const getAttributes = async (): Promise<OdspContainerAttributes> => {
-			const resolvedUrl = container.resolvedUrl as IOdspResolvedUrl;
-			if (resolvedUrl === undefined) {
-				throw new Error("Resolved Url not available on attached container");
-			}
-
-			return {
-				itemId: resolvedUrl.itemId,
-				driveId: resolvedUrl.driveId,
-			};
-		};
 
 		return {
-			tenantAttributes: getAttributes,
+			graphProperties: new OdspContainerAttributes(container),
 			audience: new OdspAudience(container),
 		};
 	}

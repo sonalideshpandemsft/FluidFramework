@@ -9,6 +9,7 @@ export type {
 	OdspContainerServices,
 	OdspContainerAttributes as OdspServiceAttributes,
 	IOdspAudience,
+	IOdspContainerAttributes as IOdspAttributes,
 	OdspMember,
 } from "./interfaces";
 export { OdspClient } from "./odspClient";

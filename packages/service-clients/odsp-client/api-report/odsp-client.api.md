@@ -12,6 +12,12 @@ import type { IServiceAudience } from '@fluidframework/fluid-static';
 import { ITelemetryBaseLogger } from '@fluidframework/common-definitions';
 import { ITokenProvider } from '@fluidframework/azure-client';
 
+// @alpha (undocumented)
+export interface IOdspAttributes {
+    // (undocumented)
+    getFileName(): string;
+}
+
 // @alpha
 export type IOdspAudience = IServiceAudience<OdspMember>;
 
@@ -48,7 +54,11 @@ export interface OdspConnectionConfig {
 // @alpha
 export interface OdspContainerServices {
     audience: IOdspAudience;
+<<<<<<< Updated upstream
     tenantAttributes: () => Promise<OdspServiceAttributes>;
+=======
+    graphProperties: IOdspAttributes;
+>>>>>>> Stashed changes
 }
 
 // @alpha
