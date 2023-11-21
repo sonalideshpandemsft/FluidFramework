@@ -31,7 +31,6 @@ export interface OdspConnectionConfig {
 	 */
 	driveId: string;
 }
-
 /**
  * @alpha
  */
@@ -70,25 +69,6 @@ export interface OdspContainerServices {
 	 * Provides an object that facilitates obtaining information about users present in the Fluid session, as well as listeners for roster changes triggered by users joining or leaving the session.
 	 */
 	audience: IOdspAudience;
-}
-
-/**
- * Represents attributes specific to Fluid container.
- * @alpha
- */
-export interface OdspContainerAttributes {
-	/**
-	 * A unique identifier for the file within the provided RaaS drive ID. When you attach a container,
-	 * a new `itemId` is created in the user's drive, which developers can use for various operations
-	 * like updating, renaming, moving the Fluid file, changing permissions, and more.
-	 */
-	itemId: string;
-
-	/**
-	 * Get the RaaS drive ID associated with the container. This can be useful when managing multiple
-	 * RaaS drives.
-	 */
-	driveId: string;
 }
 
 /**

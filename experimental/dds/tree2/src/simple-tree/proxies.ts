@@ -47,6 +47,8 @@ import {
 	TreeObjectNode,
 } from "./types";
 import { tryGetEditNodeTarget, setEditNode, getEditNode, tryGetEditNode } from "./editNode";
+import { IterableTreeListContent } from "./iterableTreeListContent";
+import { cursorFromFieldData, cursorFromNodeData } from "./toMapTree";
 
 /** Retrieve the associated proxy for the given field. */
 export function getProxyForField<TSchema extends TreeFieldSchema>(
@@ -147,7 +149,7 @@ function createObjectProxy<TSchema extends ObjectNodeSchema>(
 				// Pass the proxy as the receiver here, so that any methods on the prototype receive `proxy` as `this`.
 				return Reflect.get(target, key, proxy);
 			},
-			set(target, key, value) {
+			set(target, key, value: TreeNodeUnion<AllowedTypes, "javaScript">) {
 				const editNode = getEditNode(proxy);
 				const fieldSchema = editNode.schema.objectNodeFields.get(key as FieldKey);
 
@@ -168,15 +170,21 @@ function createObjectProxy<TSchema extends ObjectNodeSchema>(
 							| FlexTreeOptionalField<AllowedTypes>;
 
 						const { content, hydrateProxies } = extractFactoryContent(value);
+						const cursor = cursorFromNodeData(
+							content,
+							editNode.context,
+							fieldSchema.types,
+						);
 						modifyChildren(
 							editNode,
 							() => {
-								typedField.content = content;
+								typedField.content = cursor;
 							},
 							() => hydrateProxies(typedField.boxedContent),
 						);
 						break;
 					}
+
 					default:
 						fail("invalid FieldKind");
 				}
@@ -219,16 +227,16 @@ const getSequenceField = <TTypes extends AllowedTypes>(list: TreeListNode) =>
 // Used by 'insert*()' APIs to converts new content (expressed as a proxy union) to contextually
 // typed data prior to forwarding to 'LazySequence.insert*()'.
 function contextualizeInsertedListContent(
-	iterable: Iterable<TreeNodeUnion<AllowedTypes, "javaScript">>,
 	insertedAtIndex: number,
+	content: (
+		| TreeNodeUnion<AllowedTypes, "javaScript">
+		| IterableTreeListContent<TreeNodeUnion<AllowedTypes, "javaScript">>
+	)[],
 ): ExtractedFactoryContent<ContextuallyTypedNodeData[]> {
-	if (typeof iterable === "string") {
-		throw new TypeError(
-			"Attempted to directly insert a string as iterable list content. Wrap the input string 's' in an array ('[s]') to insert it as a single item or, supply the iterator of the string directly via 's[Symbol.iterator]()' if intending to insert each Unicode code point as a separate item.",
-		);
-	}
 	return extractContentArray(
-		(Array.isArray(iterable) ? iterable : Array.from(iterable)) as ContextuallyTypedNodeData[],
+		content.flatMap((c) =>
+			c instanceof IterableTreeListContent ? Array.from(c) : c,
+		) as ContextuallyTypedNodeData[],
 		insertedAtIndex,
 	);
 }
@@ -256,12 +264,23 @@ const listPrototypeProperties: PropertyDescriptorMap = {
 		value(
 			this: TreeListNode,
 			index: number,
-			value: Iterable<TreeNodeUnion<AllowedTypes, "javaScript">>,
+			...value: (
+				| TreeNodeUnion<AllowedTypes, "javaScript">
+				| IterableTreeListContent<TreeNodeUnion<AllowedTypes, "javaScript">>
+			)[]
 		): void {
-			const { content, hydrateProxies } = contextualizeInsertedListContent(value, index);
+			const sequenceField = getSequenceField(this);
+
+			const { content, hydrateProxies } = contextualizeInsertedListContent(index, value);
+			const cursor = cursorFromFieldData(
+				content,
+				sequenceField.context,
+				sequenceField.schema,
+			);
+
 			modifyChildren(
 				getEditNode(this),
-				() => getSequenceField(this).insertAt(index, content),
+				() => sequenceField.insertAt(index, cursor),
 				(listEditNode) => hydrateProxies(listEditNode),
 			);
 		},
@@ -269,12 +288,23 @@ const listPrototypeProperties: PropertyDescriptorMap = {
 	insertAtStart: {
 		value(
 			this: TreeListNode,
-			value: Iterable<TreeNodeUnion<AllowedTypes, "javaScript">>,
+			...value: (
+				| TreeNodeUnion<AllowedTypes, "javaScript">
+				| IterableTreeListContent<TreeNodeUnion<AllowedTypes, "javaScript">>
+			)[]
 		): void {
-			const { content, hydrateProxies } = contextualizeInsertedListContent(value, 0);
+			const sequenceField = getSequenceField(this);
+
+			const { content, hydrateProxies } = contextualizeInsertedListContent(0, value);
+			const cursor = cursorFromFieldData(
+				content,
+				sequenceField.context,
+				sequenceField.schema,
+			);
+
 			modifyChildren(
 				getEditNode(this),
-				() => getSequenceField(this).insertAtStart(content),
+				() => sequenceField.insertAtStart(cursor),
 				(listEditNode) => hydrateProxies(listEditNode),
 			);
 		},
@@ -282,15 +312,26 @@ const listPrototypeProperties: PropertyDescriptorMap = {
 	insertAtEnd: {
 		value(
 			this: TreeListNode,
-			value: Iterable<TreeNodeUnion<AllowedTypes, "javaScript">>,
+			...value: (
+				| TreeNodeUnion<AllowedTypes, "javaScript">
+				| IterableTreeListContent<TreeNodeUnion<AllowedTypes, "javaScript">>
+			)[]
 		): void {
+			const sequenceField = getSequenceField(this);
+
 			const { content, hydrateProxies } = contextualizeInsertedListContent(
-				value,
 				this.length,
+				value,
 			);
+			const cursor = cursorFromFieldData(
+				content,
+				sequenceField.context,
+				sequenceField.schema,
+			);
+
 			modifyChildren(
 				getEditNode(this),
-				() => getSequenceField(this).insertAtEnd(content),
+				() => sequenceField.insertAtEnd(cursor),
 				(listEditNode) => hydrateProxies(listEditNode),
 			);
 		},
@@ -594,12 +635,15 @@ const mapStaticDispatchMap: PropertyDescriptorMap = {
 			key: string,
 			value: TreeNodeUnion<AllowedTypes, "javaScript">,
 		): TreeMapNode<MapNodeSchema> {
+			const node = getEditNode(this);
+
 			const { content, hydrateProxies } = extractFactoryContent(
 				value as FlexibleFieldContent<MapFieldSchema>,
 			);
+			const cursor = cursorFromNodeData(content, node.context, node.schema.mapFields.types);
 			modifyChildren(
-				getEditNode(this),
-				(mapNode) => mapNode.set(key, content),
+				node,
+				(mapNode) => mapNode.set(key, cursor),
 				(mapNode) => hydrateProxies(getMapChildNode(mapNode, key)),
 			);
 			return this;

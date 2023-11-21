@@ -30,7 +30,7 @@ export class OdspClient {
         services: OdspContainerServices;
     }>;
     // (undocumented)
-    getContainer(sharingUrl: string, containerSchema: ContainerSchema): Promise<{
+    getContainer(id: string, containerSchema: ContainerSchema): Promise<{
         container: IFluidContainer;
         services: OdspContainerServices;
     }>;
@@ -46,7 +46,6 @@ export interface OdspClientProps {
 // @alpha
 export interface OdspConnectionConfig {
     driveId: string;
-    folderPath: string;
     siteUrl: string;
     tokenProvider: ITokenProvider;
 }
@@ -54,11 +53,7 @@ export interface OdspConnectionConfig {
 // @alpha
 export interface OdspContainerServices {
     audience: IOdspAudience;
-<<<<<<< Updated upstream
-    tenantAttributes: () => Promise<OdspServiceAttributes>;
-=======
     graphProperties: IOdspAttributes;
->>>>>>> Stashed changes
 }
 
 // @alpha
@@ -67,12 +62,6 @@ export interface OdspMember extends IMember {
     email: string;
     // (undocumented)
     name: string;
-}
-
-// @alpha
-export interface OdspServiceAttributes {
-    driveId: string;
-    itemId: string;
 }
 
 // (No @packageDocumentation comment for this package)
