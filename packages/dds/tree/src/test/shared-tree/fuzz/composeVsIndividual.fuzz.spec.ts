@@ -5,7 +5,7 @@
 
 import { strict as assert, fail } from "node:assert";
 
-import { TypedEventEmitter } from "@fluid-internal/client-utils";
+import { ComposableEventEmitter } from "@fluid-internal/client-utils";
 import {
 	type AsyncGenerator,
 	combineReducersAsync,
@@ -143,7 +143,7 @@ describe("Fuzz - composed vs individual changes", () => {
 			reducer: fuzzComposedVsIndividualReducer,
 			validateConsistency: () => {},
 		};
-		const emitter = new TypedEventEmitter<DDSFuzzHarnessEvents>();
+		const emitter = new ComposableEventEmitter<DDSFuzzHarnessEvents>();
 		emitter.on("testStart", (initialState: BranchedTreeFuzzTestState) => {
 			initialState.main = viewFromState(initialState, initialState.clients[0]);
 
