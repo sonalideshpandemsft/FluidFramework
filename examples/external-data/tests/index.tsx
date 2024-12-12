@@ -49,8 +49,9 @@ export async function createContainerAndRenderInElement(
 	let taskList: ITaskList | undefined;
 	while (taskList === undefined) {
 		const taskListsChangedP = new Promise<void>((resolve) => {
-			model.baseDocument.once("taskListCollectionChanged", () => {
+			const off = model.baseDocument.on("taskListCollectionChanged", () => {
 				resolve();
+				off();
 			});
 		});
 		taskList = model.baseDocument.getTaskList("task-list-1");

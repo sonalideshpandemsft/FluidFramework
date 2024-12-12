@@ -4,7 +4,7 @@
  */
 
 import type { IContainer } from "@fluidframework/container-definitions/internal";
-import type { IEvent, IEventProvider } from "@fluidframework/core-interfaces";
+import type { Listenable } from "@fluidframework/core-interfaces";
 
 import type { IAcceptedMigrationDetails, MigrationState } from "../migrationTool/index.js";
 
@@ -51,11 +51,13 @@ export interface IMigratorEntryPoint {
  * Events emitted by the IMigrator.
  * @alpha
  */
-export interface IMigratorEvents extends IEvent {
+export interface IMigratorEvents {
 	/**
 	 * As the migrator progresses between migration states, it emits the corresponding event.
 	 */
-	(event: "stopping" | "migrating" | "migrated", listener: () => void): void;
+	stopping(): void;
+	migrating(): void;
+	migrated(): void;
 }
 
 /**
@@ -66,7 +68,7 @@ export interface IMigrator {
 	/**
 	 * Event emitter object.
 	 */
-	readonly events: IEventProvider<IMigratorEvents>;
+	readonly events: Listenable<IMigratorEvents>;
 
 	/**
 	 * The current state of migration.

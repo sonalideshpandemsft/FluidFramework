@@ -3,13 +3,8 @@
  * Licensed under the MIT License.
  */
 
-import { TypedEventEmitter } from "@fluid-internal/client-utils";
-import type {
-	IEvent,
-	IFluidLoadable,
-	IRequest,
-	IResponse,
-} from "@fluidframework/core-interfaces";
+import { CustomEventEmitter } from "@fluid-internal/client-utils";
+import type { IFluidLoadable, IRequest, IResponse } from "@fluidframework/core-interfaces";
 import type {
 	IFluidHandleInternal,
 	// eslint-disable-next-line import/no-deprecated
@@ -33,7 +28,7 @@ import type { DataObjectTypes, IDataObjectProps } from "./types.js";
  * @alpha
  */
 export abstract class PureDataObject<I extends DataObjectTypes = DataObjectTypes>
-	extends TypedEventEmitter<I["Events"] & IEvent>
+	extends CustomEventEmitter<I["Events"]>
 	// eslint-disable-next-line import/no-deprecated
 	implements IFluidLoadable, IProvideFluidHandle
 {

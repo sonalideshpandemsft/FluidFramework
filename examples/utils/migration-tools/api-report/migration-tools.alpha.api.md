@@ -40,7 +40,7 @@ export interface IEntryPointPiece {
 // @alpha
 export interface IMigrator {
     readonly acceptedMigration: IAcceptedMigrationDetails | undefined;
-    readonly events: IEventProvider<IMigratorEvents>;
+    readonly events: Listenable<IMigratorEvents>;
     readonly migrationResult: unknown | undefined;
     readonly migrationState: MigrationState;
     readonly proposedVersion: string | undefined;
@@ -53,8 +53,12 @@ export interface IMigratorEntryPoint {
 }
 
 // @alpha
-export interface IMigratorEvents extends IEvent {
-    (event: "stopping" | "migrating" | "migrated", listener: () => void): void;
+export interface IMigratorEvents {
+    // (undocumented)
+    migrated(): void;
+    // (undocumented)
+    migrating(): void;
+    stopping(): void;
 }
 
 // @alpha

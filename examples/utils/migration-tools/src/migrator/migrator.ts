@@ -3,9 +3,9 @@
  * Licensed under the MIT License.
  */
 
-import { TypedEventEmitter } from "@fluid-internal/client-utils";
+import { createEmitter } from "@fluid-internal/client-utils";
 import type { IContainer } from "@fluidframework/container-definitions/internal";
-import type { IEventProvider } from "@fluidframework/core-interfaces";
+import type { Listenable } from "@fluidframework/core-interfaces";
 import { assert } from "@fluidframework/core-utils/internal";
 import type { ISequencedDocumentMessage } from "@fluidframework/driver-definitions/internal";
 
@@ -72,8 +72,8 @@ export class Migrator implements IMigrator {
 		return this.migrationTool.acceptedMigration;
 	}
 
-	private readonly _events = new TypedEventEmitter<IMigratorEvents>();
-	public get events(): IEventProvider<IMigratorEvents> {
+	private readonly _events = createEmitter<IMigratorEvents>();
+	public get events(): Listenable<IMigratorEvents> {
 		return this._events;
 	}
 
@@ -115,7 +115,8 @@ export class Migrator implements IMigrator {
 		if (migrationState === "migrating") {
 			this.performMigration();
 		} else if (migrationState === "collaborating" || migrationState === "stopping") {
-			this.migrationTool.events.once("migrating", this.performMigration);
+			// TODO: once
+			this.migrationTool.events.on("migrating", this.performMigration);
 		}
 		// Do nothing if already migrated
 
@@ -140,8 +141,9 @@ export class Migrator implements IMigrator {
 			// completed before we finish connecting, and in that case we want to avoid doing anything.
 			if (!this.connected) {
 				await new Promise<void>((resolve) => {
-					this.migrationTool.events.once("connected", () => {
+					const off = this.migrationTool.events.on("connected", () => {
 						resolve();
+						off();
 					});
 				});
 			}

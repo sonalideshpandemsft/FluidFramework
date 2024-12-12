@@ -69,7 +69,8 @@ describe("separate-container migration", () => {
 			const migrationP = page.evaluate(async () => {
 				const migrationPs = (window["migrators"] as IMigrator[]).map(async (migrator) => {
 					return new Promise<void>((resolve) => {
-						migrator.events.once("migrated", resolve);
+						// TODO
+						migrator.events.on("migrated", resolve);
 					});
 				});
 				return Promise.all(migrationPs);
@@ -168,7 +169,8 @@ describe("separate-container migration", () => {
 				}
 				const migrationPs = (window["migrators"] as IMigrator[]).map(async (migrator) => {
 					return new Promise<void>((resolve) => {
-						migrator.events.once("migrated", resolve);
+						// TODO
+						migrator.events.on("migrated", resolve);
 					});
 				});
 				return Promise.all(migrationPs);

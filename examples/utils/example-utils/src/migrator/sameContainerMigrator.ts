@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { TypedEventEmitter } from "@fluid-internal/client-utils";
+import { CustomEventEmitter } from "@fluid-internal/client-utils";
 import { assert } from "@fluidframework/core-utils/internal";
 
 import type {
@@ -21,7 +21,7 @@ import type { IDetachedModel, IModelLoader } from "../modelLoader/index.js";
  * @internal
  */
 export class SameContainerMigrator
-	extends TypedEventEmitter<ISameContainerMigratorEvents>
+	extends CustomEventEmitter<ISameContainerMigratorEvents>
 	implements ISameContainerMigrator
 {
 	private _currentModel: ISameContainerMigratableModel;
@@ -226,7 +226,12 @@ export class SameContainerMigrator
 	private readonly monitorMigration = async () => {
 		// Ensure we are connected
 		if (!this.currentModel.connected()) {
-			await new Promise<void>((resolve) => this.currentModel.once("connected", resolve));
+			await new Promise<void>((resolve) => {
+				const off = this.currentModel.on("connected", () => {
+					resolve();
+					off();
+				});
+			});
 		}
 		// Ensure the migration tool has reached the "readyForMigration" stage
 		if (this.currentModel.migrationTool.migrationState !== "readyForMigration") {
