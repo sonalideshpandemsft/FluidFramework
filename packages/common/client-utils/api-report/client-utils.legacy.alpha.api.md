@@ -12,7 +12,7 @@ export type EventEmitterEventType = string;
 // @alpha
 export class TypedEventEmitter<TEvent> extends EventEmitter implements IEventProvider<TEvent & IEvent> {
     constructor();
-    // (undocumented)
+    // @deprecated (undocumented)
     readonly addListener: TypedEventTransform<this, TEvent>;
     // (undocumented)
     readonly off: TypedEventTransform<this, TEvent>;
@@ -20,11 +20,11 @@ export class TypedEventEmitter<TEvent> extends EventEmitter implements IEventPro
     readonly on: TypedEventTransform<this, TEvent>;
     // (undocumented)
     readonly once: TypedEventTransform<this, TEvent>;
-    // (undocumented)
+    // @deprecated (undocumented)
     readonly prependListener: TypedEventTransform<this, TEvent>;
-    // (undocumented)
+    // @deprecated (undocumented)
     readonly prependOnceListener: TypedEventTransform<this, TEvent>;
-    // (undocumented)
+    // @deprecated (undocumented)
     readonly removeListener: TypedEventTransform<this, TEvent>;
 }
 

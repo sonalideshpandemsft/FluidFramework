@@ -70,11 +70,23 @@ export class TypedEventEmitter<TEvent>
 		this.removeListener = super.removeListener.bind(this) as TypedEventTransform<this, TEvent>;
 		this.off = super.off.bind(this) as TypedEventTransform<this, TEvent>;
 	}
+	/**
+	 * @deprecated - Use on
+	 */
 	public readonly addListener: TypedEventTransform<this, TEvent>;
 	public readonly on: TypedEventTransform<this, TEvent>;
 	public readonly once: TypedEventTransform<this, TEvent>;
+	/**
+	 * @deprecated - use on
+	 */
 	public readonly prependListener: TypedEventTransform<this, TEvent>;
+	/**
+	 * @deprecated - use on
+	 */
 	public readonly prependOnceListener: TypedEventTransform<this, TEvent>;
+	/**
+	 * @deprecated - use on
+	 */
 	public readonly removeListener: TypedEventTransform<this, TEvent>;
 	public readonly off: TypedEventTransform<this, TEvent>;
 }
