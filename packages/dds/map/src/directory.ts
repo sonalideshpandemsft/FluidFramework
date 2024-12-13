@@ -3,7 +3,8 @@
  * Licensed under the MIT License.
  */
 
-import { TypedEventEmitter } from "@fluid-internal/client-utils";
+import { createEmitter } from "@fluid-internal/client-utils";
+import type { Listenable } from "@fluidframework/core-interfaces";
 import { assert, unreachableCase } from "@fluidframework/core-utils/internal";
 import type {
 	IChannelAttributes,
@@ -1182,7 +1183,9 @@ let hasLoggedDirectoryInconsistency = false;
  * Node of the directory tree.
  * @sealed
  */
-class SubDirectory extends TypedEventEmitter<IDirectoryEvents> implements IDirectory {
+class SubDirectory implements IDirectory {
+	#events = createEmitter<IDirectoryEvents>();
+	public events: Listenable<IDirectoryEvents> = this.#events;
 	/**
 	 * Tells if the sub directory is deleted or not.
 	 */
@@ -1270,7 +1273,7 @@ class SubDirectory extends TypedEventEmitter<IDirectoryEvents> implements IDirec
 		public readonly absolutePath: string,
 		private readonly logger: ITelemetryLoggerExt,
 	) {
-		super();
+		// super();
 		this.localCreationSeqTracker = new DirectoryCreationTracker();
 		this.ackedCreationSeqTracker = new DirectoryCreationTracker();
 	}

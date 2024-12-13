@@ -142,14 +142,11 @@ export interface ISharedDirectoryEvents extends ISharedObjectEvents {
 	 *
 	 * - `target` - The {@link ISharedDirectory} itself.
 	 */
-	(
-		event: "valueChanged",
-		listener: (
-			changed: IDirectoryValueChanged,
-			local: boolean,
-			target: IEventThisPlaceHolder,
-		) => void,
-	);
+	valueChanged(
+		changed: IDirectoryValueChanged,
+		local: boolean,
+		target: IEventThisPlaceHolder,
+	): void;
 
 	/**
 	 * Emitted when the {@link ISharedDirectory} is cleared.
@@ -160,7 +157,7 @@ export interface ISharedDirectoryEvents extends ISharedObjectEvents {
 	 *
 	 * - `target` - The {@link ISharedDirectory} itself.
 	 */
-	(event: "clear", listener: (local: boolean, target: IEventThisPlaceHolder) => void);
+	clear(local: boolean, target: IEventThisPlaceHolder): void;
 
 	/**
 	 * Emitted when a subdirectory is created.
@@ -174,10 +171,7 @@ export interface ISharedDirectoryEvents extends ISharedObjectEvents {
 	 *
 	 * - `target` - The {@link ISharedDirectory} itself.
 	 */
-	(
-		event: "subDirectoryCreated",
-		listener: (path: string, local: boolean, target: IEventThisPlaceHolder) => void,
-	);
+	subDirectoryCreated(path: string, local: boolean, target: IEventThisPlaceHolder): void;
 
 	/**
 	 * Emitted when a subdirectory is deleted.
@@ -191,10 +185,7 @@ export interface ISharedDirectoryEvents extends ISharedObjectEvents {
 	 *
 	 * - `target` - The {@link ISharedDirectory} itself.
 	 */
-	(
-		event: "subDirectoryDeleted",
-		listener: (path: string, local: boolean, target: IEventThisPlaceHolder) => void,
-	);
+	subDirectoryDeleted(path: string, local: boolean, target: IEventThisPlaceHolder): void;
 }
 
 /**
@@ -217,10 +208,11 @@ export interface IDirectoryEvents extends IEvent {
 	 *
 	 * - `target` - The {@link IDirectory} itself.
 	 */
-	(
-		event: "containedValueChanged",
-		listener: (changed: IValueChanged, local: boolean, target: IEventThisPlaceHolder) => void,
-	);
+	containedValueChanged(
+		changed: IValueChanged,
+		local: boolean,
+		target: IEventThisPlaceHolder,
+	): void;
 
 	/**
 	 * Emitted when a subdirectory is created. Also emitted when a delete
@@ -235,10 +227,7 @@ export interface IDirectoryEvents extends IEvent {
 	 *
 	 * - `target` - The {@link ISharedDirectory} itself.
 	 */
-	(
-		event: "subDirectoryCreated",
-		listener: (path: string, local: boolean, target: IEventThisPlaceHolder) => void,
-	);
+	subDirectoryCreated(path: string, local: boolean, target: IEventThisPlaceHolder): void;
 
 	/**
 	 * Emitted when a subdirectory is deleted.
@@ -252,10 +241,7 @@ export interface IDirectoryEvents extends IEvent {
 	 *
 	 * - `target` - The {@link ISharedDirectory} itself.
 	 */
-	(
-		event: "subDirectoryDeleted",
-		listener: (path: string, local: boolean, target: IEventThisPlaceHolder) => void,
-	);
+	subDirectoryDeleted(path: string, local: boolean, target: IEventThisPlaceHolder): void;
 
 	/**
 	 * Emitted when this sub directory is deleted.
@@ -264,7 +250,7 @@ export interface IDirectoryEvents extends IEvent {
 	 *
 	 * - `target` - The {@link IDirectory} itself.
 	 */
-	(event: "disposed", listener: (target: IEventThisPlaceHolder) => void);
+	disposed(target: IEventThisPlaceHolder): void;
 
 	/**
 	 * Emitted when this previously deleted sub directory is restored.
@@ -275,7 +261,7 @@ export interface IDirectoryEvents extends IEvent {
 	 *
 	 * - `target` - The {@link IDirectory} itself.
 	 */
-	(event: "undisposed", listener: (target: IEventThisPlaceHolder) => void);
+	undisposed(target: IEventThisPlaceHolder): void;
 }
 
 /**
@@ -331,10 +317,7 @@ export interface ISharedMapEvents extends ISharedObjectEvents {
 	 *
 	 * - `target` - The {@link ISharedMap} itself.
 	 */
-	(
-		event: "valueChanged",
-		listener: (changed: IValueChanged, local: boolean, target: IEventThisPlaceHolder) => void,
-	);
+	valueChanged(changed: IValueChanged, local: boolean, target: IEventThisPlaceHolder): void;
 
 	/**
 	 * Emitted when the map is cleared.
@@ -345,7 +328,7 @@ export interface ISharedMapEvents extends ISharedObjectEvents {
 	 *
 	 * - `target` - The {@link ISharedMap} itself.
 	 */
-	(event: "clear", listener: (local: boolean, target: IEventThisPlaceHolder) => void);
+	clear(local: boolean, target: IEventThisPlaceHolder): void;
 }
 
 /**

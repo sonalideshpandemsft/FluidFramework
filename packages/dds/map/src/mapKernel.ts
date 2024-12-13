@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import type { TypedEventEmitter } from "@fluid-internal/client-utils";
+import type { CustomEventEmitter } from "@fluid-internal/client-utils";
 import type { IFluidHandle } from "@fluidframework/core-interfaces";
 import { assert, unreachableCase } from "@fluidframework/core-utils/internal";
 import type { IFluidSerializer } from "@fluidframework/shared-object-base/internal";
@@ -180,7 +180,7 @@ export class MapKernel {
 		private readonly handle: IFluidHandle,
 		private readonly submitMessage: (op: unknown, localOpMetadata: unknown) => void,
 		private readonly isAttached: () => boolean,
-		private readonly eventEmitter: TypedEventEmitter<ISharedMapEvents>,
+		private readonly eventEmitter: CustomEventEmitter<ISharedMapEvents>,
 	) {
 		this.localValueMaker = new LocalValueMaker();
 		this.messageHandlers = this.getMessageHandlers();
