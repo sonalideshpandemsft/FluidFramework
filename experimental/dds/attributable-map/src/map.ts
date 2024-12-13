@@ -143,7 +143,7 @@ export class AttributableMapClass
 			this.handle,
 			(op, localOpMetadata) => this.submitLocalMessage(op, localOpMetadata),
 			() => this.isAttached(),
-			this,
+			// this,
 		);
 	}
 

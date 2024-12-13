@@ -4,6 +4,11 @@
  */
 
 import { IEventThisPlaceHolder } from "@fluidframework/core-interfaces";
+import type {
+	IEmitter,
+	HasListeners,
+	Listenable,
+} from "@fluidframework/core-interfaces/internal";
 import { AttributionKey } from "@fluidframework/runtime-definitions/internal";
 import {
 	ISharedObject,
@@ -43,10 +48,15 @@ export interface ISharedMapEvents extends ISharedObjectEvents {
 	 *
 	 * - `target` - The {@link ISharedMap} itself.
 	 */
-	(
-		event: "valueChanged",
-		listener: (changed: IValueChanged, local: boolean, target: IEventThisPlaceHolder) => void,
-	);
+	valueChanged(
+		changed: IValueChanged,
+		local: boolean,
+		target:
+			| IEventThisPlaceHolder
+			| (Listenable<ISharedMapEvents> &
+					IEmitter<ISharedMapEvents> &
+					HasListeners<ISharedMapEvents>),
+	): void;
 
 	/**
 	 * Emitted when the map is cleared.
@@ -57,7 +67,14 @@ export interface ISharedMapEvents extends ISharedObjectEvents {
 	 *
 	 * - `target` - The {@link ISharedMap} itself.
 	 */
-	(event: "clear", listener: (local: boolean, target: IEventThisPlaceHolder) => void);
+	clear(
+		local: boolean,
+		target:
+			| IEventThisPlaceHolder
+			| (Listenable<ISharedMapEvents> &
+					IEmitter<ISharedMapEvents> &
+					HasListeners<ISharedMapEvents>),
+	): void;
 }
 
 /**

@@ -3,7 +3,8 @@
  * Licensed under the MIT License.
  */
 
-import { TypedEventEmitter } from "@fluid-internal/client-utils";
+import { createEmitter } from "@fluid-internal/client-utils";
+import type { Listenable } from "@fluidframework/core-interfaces";
 import { IFluidHandle } from "@fluidframework/core-interfaces";
 import { assert, unreachableCase } from "@fluidframework/core-utils/internal";
 import { ISequencedDocumentMessage } from "@fluidframework/driver-definitions/internal";
@@ -174,6 +175,9 @@ export class AttributableMapKernel {
 	 */
 	private attribution: Map<string, AttributionKey>;
 
+	#events = createEmitter<ISharedMapEvents>();
+	public events: Listenable<ISharedMapEvents> = this.#events;
+
 	/**
 	 * Create a new attributable-map kernel.
 	 * @param serializer - The serializer to serialize / parse handles
@@ -188,7 +192,7 @@ export class AttributableMapKernel {
 		private readonly handle: IFluidHandle,
 		private readonly submitMessage: (op: unknown, localOpMetadata: unknown) => void,
 		private readonly isAttached: () => boolean,
-		private readonly eventEmitter: TypedEventEmitter<ISharedMapEvents>,
+		// private readonly eventEmitter: CustomEventEmitter<ISharedMapEvents>,
 	) {
 		this.localValueMaker = new LocalValueMaker();
 		this.messageHandlers = this.getMessageHandlers();
@@ -585,7 +589,7 @@ export class AttributableMapKernel {
 		const previousLocalValue = this.data.get(key);
 		const previousValue: unknown = previousLocalValue?.value;
 		this.data.set(key, value);
-		this.eventEmitter.emit("valueChanged", { key, previousValue }, local, this.eventEmitter);
+		this.#events.emit("valueChanged", { key, previousValue }, local, this.#events);
 		return previousLocalValue;
 	}
 
@@ -595,7 +599,7 @@ export class AttributableMapKernel {
 	 */
 	private clearCore(local: boolean): void {
 		this.data.clear();
-		this.eventEmitter.emit("clear", local, this.eventEmitter);
+		this.#events.emit("clear", local, this.#events);
 	}
 
 	/**
@@ -609,7 +613,7 @@ export class AttributableMapKernel {
 		const previousValue: unknown = previousLocalValue?.value;
 		const successfullyRemoved = this.data.delete(key);
 		if (successfullyRemoved) {
-			this.eventEmitter.emit("valueChanged", { key, previousValue }, local, this.eventEmitter);
+			this.#events.emit("valueChanged", { key, previousValue }, local, this.#events);
 		}
 		return previousLocalValue;
 	}
