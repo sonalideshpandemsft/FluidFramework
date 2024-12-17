@@ -9,6 +9,7 @@ import type {
 	IEventTransformer,
 	TransformedEvent,
 } from "@fluidframework/core-interfaces";
+import type { Listener } from "events_pkg";
 
 import { EventEmitter } from "./eventEmitter.cjs";
 
@@ -69,6 +70,11 @@ export class TypedEventEmitter<TEvent>
 		>;
 		this.removeListener = super.removeListener.bind(this) as TypedEventTransform<this, TEvent>;
 		this.off = super.off.bind(this) as TypedEventTransform<this, TEvent>;
+
+		this.eventNames = super.eventNames.bind(this);
+		this.getMaxListeners = super.getMaxListeners.bind(this);
+		this.listenerCount = super.listenerCount.bind(this);
+		this.rawListeners = super.rawListeners.bind(this);
 	}
 	/**
 	 * @deprecated - Use on
@@ -89,4 +95,21 @@ export class TypedEventEmitter<TEvent>
 	 */
 	public readonly removeListener: TypedEventTransform<this, TEvent>;
 	public readonly off: TypedEventTransform<this, TEvent>;
+
+	/**
+	 * @deprecated - use on
+	 */
+	public readonly eventNames: () => (string | number)[];
+	/**
+	 * @deprecated - use on
+	 */
+	public readonly getMaxListeners: () => number;
+	/**
+	 * @deprecated - use on
+	 */
+	public readonly listenerCount: (type: string | number) => number;
+	/**
+	 * @deprecated - use on
+	 */
+	public readonly rawListeners: (type: string | number) => Listener[];
 }
