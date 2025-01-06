@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import { AttachState } from "@fluidframework/container-definitions";
 import { assert } from "@fluidframework/core-utils/internal";
@@ -72,6 +73,7 @@ import {
  * @alpha
  */
 export class OldestClientObserver
+	// eslint-disable-next-line import/no-deprecated
 	extends TypedEventEmitter<IOldestClientObserverEvents>
 	implements IOldestClientObserver
 {

@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import { IContainer } from "@fluidframework/container-definitions/legacy";
 import { IContainerRuntime } from "@fluidframework/container-runtime-definitions/legacy";
@@ -14,6 +15,7 @@ import type { IAppModel, IAppModelEvents, IBaseDocument } from "../model-interfa
  * In this demo, the AppModel just needs to hold the taskList.  In a real scenario, this may have further
  * responsibilities and functionality.
  */
+// eslint-disable-next-line import/no-deprecated
 export class AppModel extends TypedEventEmitter<IAppModelEvents> implements IAppModel {
 	public constructor(
 		public readonly baseDocument: IBaseDocument,

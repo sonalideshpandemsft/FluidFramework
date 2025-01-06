@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import { IEvent, IEventProvider } from "@fluidframework/core-interfaces";
 import { IClientDetails } from "@fluidframework/driver-definitions";
@@ -34,6 +35,7 @@ export interface ISummarizerClientElection
  * for some configured number of ops.
  */
 export class SummarizerClientElection
+	// eslint-disable-next-line import/no-deprecated
 	extends TypedEventEmitter<ISummarizerClientElectionEvents>
 	implements ISummarizerClientElection
 {

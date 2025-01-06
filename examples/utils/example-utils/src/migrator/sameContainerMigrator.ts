@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import { assert } from "@fluidframework/core-utils/legacy";
 
@@ -21,6 +22,7 @@ import type { IDetachedModel, IModelLoader } from "../modelLoader/index.js";
  * @internal
  */
 export class SameContainerMigrator
+	// eslint-disable-next-line import/no-deprecated
 	extends TypedEventEmitter<ISameContainerMigratorEvents>
 	implements ISameContainerMigrator
 {

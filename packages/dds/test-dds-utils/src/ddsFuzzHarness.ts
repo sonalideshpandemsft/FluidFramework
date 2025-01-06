@@ -7,6 +7,7 @@ import { strict as assert } from "node:assert";
 import { mkdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import type {
 	AsyncGenerator,
@@ -425,6 +426,7 @@ export interface DDSFuzzSuiteOptions {
 	 * createDDSFuzzSuite(model, options);
 	 * ```
 	 */
+	// eslint-disable-next-line import/no-deprecated
 	emitter: TypedEventEmitter<DDSFuzzHarnessEvents>;
 
 	/**
@@ -550,6 +552,7 @@ export const defaultDDSFuzzSuiteOptions: DDSFuzzSuiteOptions = {
 		numOpsBeforeAttach: 5,
 	},
 	handleGenerationDisabled: true,
+	// eslint-disable-next-line import/no-deprecated
 	emitter: new TypedEventEmitter(),
 	numberOfClients: 3,
 	only: [],

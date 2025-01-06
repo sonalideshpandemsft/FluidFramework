@@ -6,6 +6,7 @@
 import crypto from "crypto";
 import fs from "node:fs";
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import type { ITelemetryBufferedLogger } from "@fluid-internal/test-driver-definitions";
 import type { IEvent, ITelemetryBaseEvent } from "@fluidframework/core-interfaces";
@@ -40,6 +41,7 @@ class ScenarioRunnerLogger implements ITelemetryBufferedLogger {
 	private targetEvents: string[] = [];
 	private transformedEvents: Map<ScenarioRunnerTelemetryEventNames, string> = new Map();
 	private logs: ITelemetryBaseEvent[] = [];
+	// eslint-disable-next-line import/no-deprecated
 	public readonly events = new TypedEventEmitter<IScenarioRunnerTelemetryEvents>();
 
 	public constructor(private readonly baseLogger?: ITelemetryBufferedLogger) {}

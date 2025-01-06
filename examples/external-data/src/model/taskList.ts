@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import { DataObject, DataObjectFactory } from "@fluidframework/aqueduct/legacy";
 // eslint-disable-next-line import/no-internal-modules -- #26903: `cell` internals used in examples
@@ -24,6 +25,7 @@ import type {
 	ITaskList,
 } from "../model-interface/index.js";
 
+// eslint-disable-next-line import/no-deprecated
 class Task extends TypedEventEmitter<ITaskEvents> implements ITask {
 	public get id(): string {
 		return this._id;

@@ -4,6 +4,7 @@
  */
 
 import type { ISameContainerMigrationTool } from "@fluid-example/example-utils";
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import { AttachState } from "@fluidframework/container-definitions";
 import type { IContainer } from "@fluidframework/container-definitions/legacy";
@@ -27,6 +28,7 @@ export type InventoryListAppModelExportFormat2 = string;
  * Container does -- instead it is specially designed for the specific container code.
  */
 export class InventoryListAppModel
+	// eslint-disable-next-line import/no-deprecated
 	extends TypedEventEmitter<IInventoryListAppModelEvents>
 	implements IInventoryListAppModel
 {

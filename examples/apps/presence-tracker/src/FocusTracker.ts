@@ -4,6 +4,7 @@
  */
 
 import { ISignaler } from "@fluid-experimental/data-objects";
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import type { IAzureAudience } from "@fluidframework/azure-client";
 import { IContainer } from "@fluidframework/container-definitions/internal";
@@ -19,6 +20,7 @@ export interface IFocusSignalPayload {
 	focus: boolean;
 }
 
+// eslint-disable-next-line import/no-deprecated
 export class FocusTracker extends TypedEventEmitter<IFocusTrackerEvents> {
 	private static readonly focusSignalType = "changedFocus";
 	private static readonly focusRequestType = "focusRequest";

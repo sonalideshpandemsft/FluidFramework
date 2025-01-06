@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import { IDisposable } from "@fluidframework/core-interfaces";
 import { delay } from "@fluidframework/core-utils/internal";
@@ -186,6 +187,7 @@ export class ReplayControllerStatic extends ReplayController {
 }
 
 export class ReplayDocumentDeltaConnection
+	// eslint-disable-next-line import/no-deprecated
 	extends TypedEventEmitter<IDocumentDeltaConnectionEvents>
 	implements IDocumentDeltaConnection, IDisposable
 {

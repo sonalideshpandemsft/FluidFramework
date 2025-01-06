@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import { ITelemetryBaseLogger } from "@fluidframework/core-interfaces";
 import { IClient } from "@fluidframework/driver-definitions";
@@ -29,6 +30,7 @@ import { LocalDocumentStorageService } from "./localDocumentStorageService.js";
  * @internal
  */
 export class LocalDocumentService
+	// eslint-disable-next-line import/no-deprecated
 	extends TypedEventEmitter<IDocumentServiceEvents>
 	implements IDocumentService
 {

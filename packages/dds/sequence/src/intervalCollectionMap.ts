@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import { IFluidHandle } from "@fluidframework/core-interfaces";
 import { assert } from "@fluidframework/core-utils/internal";
@@ -139,6 +140,7 @@ export class IntervalCollectionMap<T extends ISerializableInterval> {
 		) => void,
 		private readonly type: IIntervalCollectionType<T>,
 		private readonly options?: Partial<SequenceOptions>,
+		// eslint-disable-next-line import/no-deprecated
 		public readonly eventEmitter = new TypedEventEmitter<ISharedDefaultMapEvents>(),
 	) {}
 

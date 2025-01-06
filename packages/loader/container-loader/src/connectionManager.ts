@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter, performance } from "@fluid-internal/client-utils";
 import { ICriticalContainerError } from "@fluidframework/container-definitions";
 import { IDeltaQueue, ReadOnlyInfo } from "@fluidframework/container-definitions/internal";
@@ -97,6 +98,7 @@ const clientNoDeltaStream: IClient = {
 const clientIdNoDeltaStream: string = "storage-only client";
 
 class NoDeltaStream
+	// eslint-disable-next-line import/no-deprecated
 	extends TypedEventEmitter<IDocumentDeltaConnectionEvents>
 	implements IDocumentDeltaConnection, IDisposable
 {

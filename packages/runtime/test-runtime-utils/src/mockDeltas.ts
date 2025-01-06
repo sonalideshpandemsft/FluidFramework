@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+// eslint-disable-next-line import/no-deprecated
 import { EventEmitter, TypedEventEmitter } from "@fluid-internal/client-utils";
 import {
 	IDeltaManager,
@@ -102,6 +103,7 @@ export class MockDeltaQueue<T> extends EventEmitter implements IDeltaQueue<T> {
  * @alpha
  */
 export class MockDeltaManager
+	// eslint-disable-next-line import/no-deprecated
 	extends TypedEventEmitter<IDeltaManagerEvents>
 	implements IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>
 {

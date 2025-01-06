@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import type { SaveInfo } from "@fluid-private/stochastic-test-utils";
 import { makeRandom } from "@fluid-private/stochastic-test-utils";
@@ -195,7 +196,9 @@ export class FuzzTestMinimizer<
 	 * to avoid dealing with transforms that would result in invalid ops
 	 */
 	private async assertFails(): Promise<boolean> {
+		// biome-ignore lint/suspicious/noAssignInExpressions: <explanation>
 		const emitter = (this.providedOptions.emitter ??=
+			// eslint-disable-next-line import/no-deprecated
 			new TypedEventEmitter<DDSFuzzHarnessEvents>());
 
 		let lastOp: BaseOperation = { type: "___none___" };

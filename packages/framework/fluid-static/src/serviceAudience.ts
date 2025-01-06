@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import type { IAudience } from "@fluidframework/container-definitions";
 import type { IContainer } from "@fluidframework/container-definitions/internal";
@@ -40,6 +41,7 @@ export function createServiceAudience<TMember extends IMember = IMember>(props: 
  * @internal
  */
 class ServiceAudience<TMember extends IMember = IMember>
+	// eslint-disable-next-line import/no-deprecated
 	extends TypedEventEmitter<IServiceAudienceEvents<TMember>>
 	implements IServiceAudience<TMember>
 {

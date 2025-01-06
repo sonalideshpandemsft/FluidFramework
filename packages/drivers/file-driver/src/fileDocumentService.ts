@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import { IClient } from "@fluidframework/driver-definitions";
 import {
@@ -21,6 +22,7 @@ import { FileDeltaStorageService } from "./fileDeltaStorageService.js";
  * underlying storage for file document service.
  */
 export class FileDocumentService
+	// eslint-disable-next-line import/no-deprecated
 	extends TypedEventEmitter<IDocumentServiceEvents>
 	implements IDocumentService
 {

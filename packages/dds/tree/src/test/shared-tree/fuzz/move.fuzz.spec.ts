@@ -28,6 +28,7 @@ import {
 	populatedInitialState,
 } from "./fuzzUtils.js";
 import type { Operation } from "./operationTypes.js";
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 
 describe("Fuzz - move", () => {

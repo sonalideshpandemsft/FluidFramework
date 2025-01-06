@@ -9,22 +9,22 @@ export { EventEmitter }
 // @alpha
 export type EventEmitterEventType = string;
 
-// @alpha
+// @alpha @deprecated
 export class TypedEventEmitter<TEvent> extends EventEmitter implements IEventProvider<TEvent & IEvent> {
     constructor();
-    // (undocumented)
+    // @deprecated (undocumented)
     readonly addListener: TypedEventTransform<this, TEvent>;
     // (undocumented)
     readonly off: TypedEventTransform<this, TEvent>;
     // (undocumented)
     readonly on: TypedEventTransform<this, TEvent>;
-    // (undocumented)
+    // @deprecated (undocumented)
     readonly once: TypedEventTransform<this, TEvent>;
-    // (undocumented)
+    // @deprecated (undocumented)
     readonly prependListener: TypedEventTransform<this, TEvent>;
-    // (undocumented)
+    // @deprecated (undocumented)
     readonly prependOnceListener: TypedEventTransform<this, TEvent>;
-    // (undocumented)
+    // @deprecated (undocumented)
     readonly removeListener: TypedEventTransform<this, TEvent>;
 }
 

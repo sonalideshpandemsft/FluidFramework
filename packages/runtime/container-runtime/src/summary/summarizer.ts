@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import type {
 	ISummarizerEvents,
@@ -71,6 +72,7 @@ export const createSummarizingWarning = (errorMessage: string, logged: boolean) 
  * @legacy
  * @alpha
  */
+// eslint-disable-next-line import/no-deprecated
 export class Summarizer extends TypedEventEmitter<ISummarizerEvents> implements ISummarizer {
 	public get ISummarizer() {
 		return this;

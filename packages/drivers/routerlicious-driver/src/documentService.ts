@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import { assert } from "@fluidframework/core-utils/internal";
 import { IClient } from "@fluidframework/driver-definitions";
@@ -54,6 +55,7 @@ import { ITokenProvider } from "./tokens.js";
  * clients.
  */
 export class DocumentService
+	// eslint-disable-next-line import/no-deprecated
 	extends TypedEventEmitter<IDocumentServiceEvents>
 	implements IDocumentService
 {

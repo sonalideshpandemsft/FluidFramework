@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+// eslint-disable-next-line import/no-deprecated
 import type { TypedEventEmitter } from "@fluid-internal/client-utils";
 import type { IFluidHandle } from "@fluidframework/core-interfaces";
 import { assert, unreachableCase } from "@fluidframework/core-utils/internal";
@@ -180,6 +181,7 @@ export class MapKernel {
 		private readonly handle: IFluidHandle,
 		private readonly submitMessage: (op: unknown, localOpMetadata: unknown) => void,
 		private readonly isAttached: () => boolean,
+		// eslint-disable-next-line import/no-deprecated
 		private readonly eventEmitter: TypedEventEmitter<ISharedMapEvents>,
 	) {
 		this.localValueMaker = new LocalValueMaker();

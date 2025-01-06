@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import { AttachState } from "@fluidframework/container-definitions";
 import { FluidObject, IFluidHandle, IRequest } from "@fluidframework/core-interfaces";
@@ -60,6 +61,7 @@ const mapWait = async <T = any>(map: ISharedMap, key: string): Promise<T> => {
 const schedulerId = "scheduler";
 
 export class AgentScheduler
+	// eslint-disable-next-line import/no-deprecated
 	extends TypedEventEmitter<IAgentSchedulerEvents>
 	implements IAgentScheduler
 {

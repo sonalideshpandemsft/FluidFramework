@@ -5,6 +5,7 @@
 
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import { type IEventThisPlaceHolder, IFluidHandle } from "@fluidframework/core-interfaces";
 import { assert, unreachableCase, isObject } from "@fluidframework/core-utils/internal";
@@ -146,6 +147,7 @@ export interface IClientEvents {
  *
  * @internal
  */
+// eslint-disable-next-line import/no-deprecated
 export class Client extends TypedEventEmitter<IClientEvents> {
 	public longClientId: string | undefined;
 

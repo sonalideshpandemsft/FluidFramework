@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import { assert, unreachableCase } from "@fluidframework/core-utils/internal";
 import type {
@@ -1182,6 +1183,7 @@ let hasLoggedDirectoryInconsistency = false;
  * Node of the directory tree.
  * @sealed
  */
+// eslint-disable-next-line import/no-deprecated
 class SubDirectory extends TypedEventEmitter<IDirectoryEvents> implements IDirectory {
 	/**
 	 * Tells if the sub directory is deleted or not.

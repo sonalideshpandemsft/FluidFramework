@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import { IEvent } from "@fluidframework/core-interfaces";
 import { assert, Timer } from "@fluidframework/core-utils/internal";
@@ -35,6 +36,7 @@ export interface INoopSenderEvents extends IEvent {
 //    server timeout of 2000ms should be reconsidered to be increased.
 // 2. If there are more than 50 ops received without sending any ops, send noop to keep collab window small.
 //    Note that system ops (including noops themselves) are excluded, so it's 1 noop per 50 real ops.
+// eslint-disable-next-line import/no-deprecated
 export class NoopHeuristic extends TypedEventEmitter<INoopSenderEvents> {
 	private opsProcessedSinceOpSent = 0;
 	private readonly timer: Timer | undefined;

@@ -5,6 +5,7 @@
 
 /* eslint-disable unicorn/consistent-function-scoping */
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter, performance } from "@fluid-internal/client-utils";
 import {
 	AttachState,
@@ -773,6 +774,7 @@ export class Container
 		});
 	}
 
+	// eslint-disable-next-line import/no-deprecated
 	private readonly _lifecycleEvents = new TypedEventEmitter<IContainerLifecycleEvents>();
 
 	constructor(

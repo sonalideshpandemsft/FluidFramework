@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import { IDeltaManager } from "@fluidframework/container-definitions/internal";
 import { IDisposable, IEvent } from "@fluidframework/core-interfaces";
@@ -250,6 +251,7 @@ export interface ISummaryCollectionOpEvents extends IEvent {
  * @legacy
  * @alpha
  */
+// eslint-disable-next-line import/no-deprecated
 export class SummaryCollection extends TypedEventEmitter<ISummaryCollectionOpEvents> {
 	// key: clientId
 	private readonly summaryWatchers = new Map<string, ClientSummaryWatcher>();

@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+// eslint-disable-next-line import/no-deprecated
 import { EventEmitter, TypedEventEmitter, stringToBuffer } from "@fluid-internal/client-utils";
 import {
 	AttachState,
@@ -205,6 +206,7 @@ export interface IInternalMockRuntimeMessage {
  * @legacy
  * @alpha
  */
+// eslint-disable-next-line import/no-deprecated
 export class MockContainerRuntime extends TypedEventEmitter<IContainerRuntimeEvents> {
 	public clientId: string;
 	public readonly deltaManager: MockDeltaManager;
@@ -736,6 +738,7 @@ export class MockQuorumClients implements IQuorumClients, EventEmitter {
  * @alpha
  */
 export class MockAudience
+	// eslint-disable-next-line import/no-deprecated
 	extends TypedEventEmitter<IAudienceEvents>
 	implements IAudienceOwner
 {

@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+// eslint-disable-next-line import/no-deprecated
 import { Trace, TypedEventEmitter } from "@fluid-internal/client-utils";
 import {
 	AttachState,
@@ -871,6 +872,7 @@ export async function loadContainerRuntime(
  * @alpha
  */
 export class ContainerRuntime
+	// eslint-disable-next-line import/no-deprecated
 	extends TypedEventEmitter<IContainerRuntimeEvents>
 	implements
 		IContainerRuntime,
@@ -1960,6 +1962,7 @@ export class ContainerRuntime
 			this.on("connected", () => {
 				const clientId = this.clientId;
 				assert(clientId !== undefined, 0x975 /* can't be undefined */);
+				// eslint-disable-next-line import/no-deprecated
 				(audience as unknown as TypedEventEmitter<IAudienceEvents>).emit(
 					"selfChanged",
 					{ clientId: oldClientId },

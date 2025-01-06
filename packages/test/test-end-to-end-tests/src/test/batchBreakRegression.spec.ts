@@ -7,6 +7,7 @@
 
 import { strict as assert } from "assert";
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import { describeCompat, itExpects } from "@fluid-private/test-version-utils";
 import {

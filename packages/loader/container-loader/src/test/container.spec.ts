@@ -5,6 +5,7 @@
 
 import assert from "node:assert";
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import { AttachState, IAudience } from "@fluidframework/container-definitions/";
 import {

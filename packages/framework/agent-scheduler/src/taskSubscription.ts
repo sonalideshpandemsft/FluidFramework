@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import { IEvent } from "@fluidframework/core-interfaces";
 
@@ -22,6 +23,7 @@ export interface ITaskSubscriptionEvents extends IEvent {
  * @legacy
  * @alpha
  */
+// eslint-disable-next-line import/no-deprecated
 export class TaskSubscription extends TypedEventEmitter<ITaskSubscriptionEvents> {
 	private subscribed: boolean = false;
 

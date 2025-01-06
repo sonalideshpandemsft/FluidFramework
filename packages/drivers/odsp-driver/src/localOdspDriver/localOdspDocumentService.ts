@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import { IClient } from "@fluidframework/driver-definitions";
 import {
@@ -23,6 +24,7 @@ import { LocalOdspDocumentStorageService } from "./localOdspDocumentStorageManag
  * IDocumentService implementation that provides explicit snapshot to the document storage service.
  */
 export class LocalOdspDocumentService
+	// eslint-disable-next-line import/no-deprecated
 	extends TypedEventEmitter<IDocumentServiceEvents>
 	implements IDocumentService
 {

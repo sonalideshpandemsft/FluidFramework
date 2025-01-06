@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import type {
 	IEvent,
@@ -33,6 +34,7 @@ import type { DataObjectTypes, IDataObjectProps } from "./types.js";
  * @alpha
  */
 export abstract class PureDataObject<I extends DataObjectTypes = DataObjectTypes>
+	// eslint-disable-next-line import/no-deprecated
 	extends TypedEventEmitter<I["Events"] & IEvent>
 	// eslint-disable-next-line import/no-deprecated
 	implements IFluidLoadable, IProvideFluidHandle

@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import type {
 	ISummarizeEventProps,
@@ -80,6 +81,7 @@ export const defaultMaxAttemptsForSubmitFailures = 5;
  * This object is created and controlled by Summarizer object.
  */
 export class RunningSummarizer
+	// eslint-disable-next-line import/no-deprecated
 	extends TypedEventEmitter<ISummarizerEvents>
 	implements IDisposable
 {

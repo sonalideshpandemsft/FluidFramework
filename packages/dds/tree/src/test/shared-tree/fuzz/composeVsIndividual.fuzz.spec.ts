@@ -5,6 +5,7 @@
 
 import { strict as assert, fail } from "node:assert";
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import {
 	type AsyncGenerator,

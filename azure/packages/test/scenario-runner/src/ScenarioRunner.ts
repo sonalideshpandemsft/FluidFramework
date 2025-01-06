@@ -5,6 +5,7 @@
 
 import { ChildProcess } from "child_process";
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import { delay } from "@fluidframework/core-utils/internal";
 
@@ -25,6 +26,7 @@ export abstract class ScenarioRunner<
 		A,
 		S = A,
 	>
+	// eslint-disable-next-line import/no-deprecated
 	extends TypedEventEmitter<IRunnerEvents>
 	implements IRunner
 {

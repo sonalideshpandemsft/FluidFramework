@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import type {
 	IConnectionDetails,
@@ -32,6 +33,7 @@ import { summarizerClientType } from "./summary/index.js";
  * of the DeltaManager.
  */
 export abstract class BaseDeltaManagerProxy
+	// eslint-disable-next-line import/no-deprecated
 	extends TypedEventEmitter<IDeltaManagerEvents>
 	implements IDeltaManagerFull
 {

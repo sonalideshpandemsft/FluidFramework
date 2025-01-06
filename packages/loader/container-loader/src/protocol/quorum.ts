@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import { assert } from "@fluidframework/core-utils/internal";
 import { IQuorumClients, ISequencedClient } from "@fluidframework/driver-definitions";
@@ -62,6 +63,7 @@ export interface IQuorumSnapshot {
  * @internal
  */
 export class QuorumClients
+	// eslint-disable-next-line import/no-deprecated
 	extends TypedEventEmitter<IQuorumClients["on"]>
 	implements IQuorumClients
 {
@@ -145,6 +147,7 @@ export class QuorumClients
  * @internal
  */
 export class QuorumProposals
+	// eslint-disable-next-line import/no-deprecated
 	extends TypedEventEmitter<IQuorumProposals["on"]>
 	implements IQuorumProposals
 {
@@ -432,6 +435,7 @@ export class QuorumProposals
  * they have agreed upon and any pending proposals.
  * @internal
  */
+// eslint-disable-next-line import/no-deprecated
 export class Quorum extends TypedEventEmitter<IQuorum["on"]> implements IQuorum {
 	private readonly quorumClients: QuorumClients;
 	private readonly quorumProposals: QuorumProposals;

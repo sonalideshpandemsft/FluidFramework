@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import {
 	type IDevtoolsMessage,
@@ -29,6 +30,7 @@ import {
  * @internal
  */
 export class WindowMessageRelay
+	// eslint-disable-next-line import/no-deprecated
 	extends TypedEventEmitter<IMessageRelayEvents>
 	implements IMessageRelay
 {

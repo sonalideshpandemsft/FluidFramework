@@ -9,6 +9,7 @@ import { strict as assert } from "assert";
 import { mkdirSync, readFileSync } from "fs";
 import path from "path";
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import {
 	AsyncGenerator,

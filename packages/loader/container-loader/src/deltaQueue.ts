@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter, performance } from "@fluid-internal/client-utils";
 import {
 	IDeltaQueue,
@@ -17,6 +18,7 @@ export interface IDeltaQueueWriter<T> {
 }
 
 export class DeltaQueue<T>
+	// eslint-disable-next-line import/no-deprecated
 	extends TypedEventEmitter<IDeltaQueueEvents<T>>
 	implements IDeltaQueue<T>, IDeltaQueueWriter<T>
 {

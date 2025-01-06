@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import type {
 	IDevtoolsMessage,
@@ -25,6 +26,7 @@ export type MockRelayMessageHandler = (
  * Takes in a message handler that (optionally) directly returns a response message to be emitted.
  */
 export class MockMessageRelay
+	// eslint-disable-next-line import/no-deprecated
 	extends TypedEventEmitter<IMessageRelayEvents>
 	implements IMessageRelay
 {

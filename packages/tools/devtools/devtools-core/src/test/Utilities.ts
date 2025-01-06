@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import type { IAudience } from "@fluidframework/container-definitions";
 import type {
@@ -18,6 +19,7 @@ import { MockAudience } from "@fluidframework/test-runtime-utils/internal";
  * Mock {@link @fluidframework/container-definitions#IContainer} for use in tests.
  */
 class MockContainer
+	// eslint-disable-next-line import/no-deprecated
 	extends TypedEventEmitter<IContainerEvents>
 	implements Partial<Omit<IContainer, "on" | "off" | "once">>
 {

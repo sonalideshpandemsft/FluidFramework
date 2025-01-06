@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import { IAudienceEvents, ISelf } from "@fluidframework/container-definitions";
 import { IAudienceOwner } from "@fluidframework/container-definitions/internal";
@@ -12,6 +13,7 @@ import { IClient } from "@fluidframework/driver-definitions";
 /**
  * Audience represents all clients connected to the op stream.
  */
+// eslint-disable-next-line import/no-deprecated
 export class Audience extends TypedEventEmitter<IAudienceEvents> implements IAudienceOwner {
 	private readonly members = new Map<string, IClient>();
 	private _currentClientId: string | undefined;

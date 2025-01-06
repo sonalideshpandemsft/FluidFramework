@@ -4,6 +4,7 @@
  */
 
 import { ISignaler } from "@fluid-experimental/data-objects";
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import type { IAzureAudience } from "@fluidframework/azure-client";
 import { IEvent } from "@fluidframework/core-interfaces";
@@ -23,6 +24,7 @@ export interface IMouseSignalPayload {
 	pos: IMousePosition;
 }
 
+// eslint-disable-next-line import/no-deprecated
 export class MouseTracker extends TypedEventEmitter<IMouseTrackerEvents> {
 	private static readonly mouseSignalType = "positionChanged";
 

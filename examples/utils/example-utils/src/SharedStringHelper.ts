@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import type { IEvent } from "@fluidframework/core-interfaces";
 import { MergeTreeDeltaType } from "@fluidframework/merge-tree/legacy";
@@ -37,6 +38,7 @@ export interface ISharedStringHelperEvents extends IEvent {
  * Given a {@link @fluidframework/sequence#SharedString}, will provide a friendly API for use.
  * @internal
  */
+// eslint-disable-next-line import/no-deprecated
 export class SharedStringHelper extends TypedEventEmitter<ISharedStringHelperEvents> {
 	private readonly _sharedString: SharedString;
 	private _latestText: string;

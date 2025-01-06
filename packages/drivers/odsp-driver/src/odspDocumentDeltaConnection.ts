@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter, performance } from "@fluid-internal/client-utils";
 import { IEvent } from "@fluidframework/core-interfaces";
 import { assert, Deferred } from "@fluidframework/core-utils/internal";
@@ -53,6 +54,7 @@ interface ISocketEvents extends IEvent {
 	);
 }
 
+// eslint-disable-next-line import/no-deprecated
 class SocketReference extends TypedEventEmitter<ISocketEvents> {
 	private references: number = 1;
 	private delayDeleteTimeout: ReturnType<typeof setTimeout> | undefined;

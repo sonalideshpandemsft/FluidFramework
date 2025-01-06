@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+// eslint-disable-next-line import/no-deprecated
 import { type EventEmitterEventType, TypedEventEmitter } from "@fluid-internal/client-utils";
 import type { IEvent } from "@fluidframework/core-interfaces";
 
@@ -20,6 +21,7 @@ import type { IEvent } from "@fluidframework/core-interfaces";
  */
 export class EventEmitterWithErrorHandling<
 	TEvent extends IEvent = IEvent,
+	// eslint-disable-next-line import/no-deprecated
 > extends TypedEventEmitter<TEvent> {
 	public constructor(
 		// TODO: use `unknown` instead (breaking API change)

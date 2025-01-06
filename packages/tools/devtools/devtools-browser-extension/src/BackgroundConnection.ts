@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import {
 	type IDevtoolsMessage,
@@ -69,6 +70,7 @@ export interface BackgroundConnectionParameters {
  * we simply throw if the background service disconnects (fail-fast).
  */
 export class BackgroundConnection
+	// eslint-disable-next-line import/no-deprecated
 	extends TypedEventEmitter<IMessageRelayEvents>
 	implements IMessageRelay
 {

@@ -5,6 +5,7 @@
 
 import { strict as assert } from "assert";
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import { IDeltaManager } from "@fluidframework/container-definitions/internal";
 import {

@@ -5,6 +5,7 @@
 
 /* eslint-disable @rushstack/no-new-null */
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import { IDeltaManager } from "@fluidframework/container-definitions/internal";
 import { IEvent, IEventProvider, ITelemetryBaseLogger } from "@fluidframework/core-interfaces";
@@ -86,6 +87,7 @@ export interface IOrderedClientCollection
  * The first (root) node is a placeholder to simplify logic and reduce null checking.
  */
 export class OrderedClientCollection
+	// eslint-disable-next-line import/no-deprecated
 	extends TypedEventEmitter<IOrderedClientCollectionEvents>
 	implements IOrderedClientCollection
 {
@@ -287,6 +289,7 @@ export interface IOrderedClientElection extends IEventProvider<IOrderedClientEle
  * are called under the same conditions for all clients.
  */
 export class OrderedClientElection
+	// eslint-disable-next-line import/no-deprecated
 	extends TypedEventEmitter<IOrderedClientElectionEvents>
 	implements IOrderedClientElection
 {

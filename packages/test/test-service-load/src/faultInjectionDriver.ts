@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import { IDisposable, ITelemetryBaseLogger } from "@fluidframework/core-interfaces";
 import { assert, Deferred } from "@fluidframework/core-utils/internal";
@@ -64,6 +65,7 @@ export class FaultInjectionDocumentServiceFactory implements IDocumentServiceFac
 }
 
 export class FaultInjectionDocumentService
+	// eslint-disable-next-line import/no-deprecated
 	extends TypedEventEmitter<IDocumentServiceEvents>
 	implements IDocumentService
 {
@@ -155,6 +157,7 @@ export class FaultInjectionDocumentService
 }
 
 export class FaultInjectionDocumentDeltaConnection
+	// eslint-disable-next-line import/no-deprecated
 	extends TypedEventEmitter<IDocumentDeltaConnectionEvents>
 	implements IDocumentDeltaConnection, IDisposable
 {

@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import { IClient } from "@fluidframework/driver-definitions";
 import {
@@ -24,6 +25,7 @@ import { MockDocumentDeltaConnection } from "./mockDocumentDeltaConnection.js";
  * @internal
  */
 export class MockDocumentService
+	// eslint-disable-next-line import/no-deprecated
 	extends TypedEventEmitter<IDocumentServiceEvents>
 	implements IDocumentService
 {

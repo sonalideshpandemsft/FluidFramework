@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import type {
 	ISummarizerEvents,
@@ -91,6 +92,7 @@ export interface ISummaryManagerConfig {
  * stopping existing summarizer client.
  */
 export class SummaryManager
+	// eslint-disable-next-line import/no-deprecated
 	extends TypedEventEmitter<ISummarizerEvents>
 	implements IDisposable
 {

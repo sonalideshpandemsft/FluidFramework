@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import type { IFluidHandle } from "@fluidframework/core-interfaces";
 import type { IChannelAttributes } from "@fluidframework/datastore-definitions/internal";
@@ -17,6 +18,7 @@ import { MockHandle } from "@fluidframework/test-runtime-utils/internal";
  *
  * @remarks If additional functionality is needed for new tests, please feel free to add them.
  */
+// eslint-disable-next-line import/no-deprecated
 class MockSharedObject extends TypedEventEmitter<ISharedObjectEvents> {
 	public readonly id: string;
 

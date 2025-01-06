@@ -4,6 +4,7 @@
  */
 
 import {
+	// eslint-disable-next-line import/no-deprecated
 	TypedEventEmitter,
 	bufferToString,
 	stringToBuffer,
@@ -98,6 +99,7 @@ export type IBlobManagerRuntime = Pick<
 	IContainerRuntime,
 	"attachState" | "connected" | "baseLogger" | "clientDetails"
 > &
+	// eslint-disable-next-line import/no-deprecated
 	TypedEventEmitter<IContainerRuntimeEvents>;
 
 type ICreateBlobResponseWithTTL = ICreateBlobResponse &
@@ -143,6 +145,7 @@ const stashedPendingBlobOverrides: Pick<
 
 export const blobManagerBasePath = "_blobs" as const;
 
+// eslint-disable-next-line import/no-deprecated
 export class BlobManager extends TypedEventEmitter<IBlobManagerEvents> {
 	private readonly mc: MonitoringContext;
 

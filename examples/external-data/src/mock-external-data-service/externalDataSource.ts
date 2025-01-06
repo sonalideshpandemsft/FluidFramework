@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import type { IEvent } from "@fluidframework/core-interfaces";
 import { Response } from "node-fetch";
@@ -66,6 +67,7 @@ export interface IExternalDataSourceEvents extends IEvent {
  *
  * TODO: Consider adding a fake delay to the async calls to give us a better approximation of expected experience.
  */
+// eslint-disable-next-line import/no-deprecated
 export class ExternalDataSource extends TypedEventEmitter<IExternalDataSourceEvents> {
 	private data: ITaskListData;
 

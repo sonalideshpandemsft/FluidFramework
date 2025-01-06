@@ -5,6 +5,7 @@
 
 import { strict as assert } from "node:assert";
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import { generatePairwiseOptions } from "@fluid-private/test-pairwise-generator";
 import { AttachState } from "@fluidframework/container-definitions";

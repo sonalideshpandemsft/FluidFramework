@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import { AttachState, IDeltaManager } from "@fluidframework/container-definitions/internal";
 import { FluidObject, IRequest, IResponse } from "@fluidframework/core-interfaces";
@@ -38,6 +39,7 @@ import { RuntimeAttributor } from "./runtimeAttributor.js";
  * Data store channel for the runtime attributor. This channel is responsible for storing and managing the
  */
 export class RuntimeAttributorDataStoreChannel
+	// eslint-disable-next-line import/no-deprecated
 	extends TypedEventEmitter<IFluidDataStoreRuntimeEvents>
 	implements IFluidDataStoreChannel
 {

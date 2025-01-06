@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+// eslint-disable-next-line import/no-deprecated
 import { EventEmitter, TypedEventEmitter } from "@fluid-internal/client-utils";
 import {
 	DataObject,
@@ -86,6 +87,7 @@ export interface IRuntimeSignaler {
  * manage callbacks, and thus will reflect that behavior with regards to callback registration and
  * deregistration.
  */
+// eslint-disable-next-line import/no-deprecated
 class InternalSignaler extends TypedEventEmitter<IErrorEvent> implements ISignaler {
 	private readonly emitter = new EventEmitter();
 

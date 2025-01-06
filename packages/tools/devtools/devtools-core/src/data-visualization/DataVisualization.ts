@@ -6,6 +6,7 @@
 // Indexed-object style is used to ease documentation.
 /* eslint-disable @typescript-eslint/consistent-indexed-object-style */
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import type {
 	IDisposable,
@@ -144,6 +145,7 @@ export interface DataVisualizerEvents extends IEvent {
  * to visualize subtrees as needed.
  */
 export class DataVisualizerGraph
+	// eslint-disable-next-line import/no-deprecated
 	extends TypedEventEmitter<DataVisualizerEvents>
 	implements IDisposable
 {
@@ -336,6 +338,7 @@ export class DataVisualizerGraph
  * an updated visual tree will be emitted via this object's {@link SharedObjectListenerEvents | "update" event}.
  */
 export class VisualizerNode
+	// eslint-disable-next-line import/no-deprecated
 	extends TypedEventEmitter<DataVisualizerEvents>
 	implements IDisposable
 {

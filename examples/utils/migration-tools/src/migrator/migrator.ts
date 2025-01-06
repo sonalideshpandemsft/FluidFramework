@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import type { IContainer } from "@fluidframework/container-definitions/legacy";
 import type { IEventProvider } from "@fluidframework/core-interfaces";
@@ -72,6 +73,7 @@ export class Migrator implements IMigrator {
 		return this.migrationTool.acceptedMigration;
 	}
 
+	// eslint-disable-next-line import/no-deprecated
 	private readonly _events = new TypedEventEmitter<IMigratorEvents>();
 	public get events(): IEventProvider<IMigratorEvents> {
 		return this._events;

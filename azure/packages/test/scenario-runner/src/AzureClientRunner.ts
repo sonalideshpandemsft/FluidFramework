@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import { AzureClient } from "@fluidframework/azure-client";
 
@@ -33,6 +34,7 @@ export interface AzureClientRunnerConfig {
 }
 export type AzureClientRunnerRunConfig = AzureClientRunnerConfig & IRunConfig;
 
+// eslint-disable-next-line import/no-deprecated
 export class AzureClientRunner extends TypedEventEmitter<IRunnerEvents> implements IRunner {
 	private status: RunnerStatus = RunnerStatus.NotStarted;
 	constructor(private readonly c: AzureClientRunnerConfig) {

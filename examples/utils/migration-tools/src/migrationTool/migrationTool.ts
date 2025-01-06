@@ -4,6 +4,7 @@
  */
 
 import { IPactMap, PactMap } from "@fluid-experimental/pact-map";
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import type {
 	FluidObject,
@@ -46,6 +47,7 @@ class MigrationTool implements IMigrationTool {
 		return this._disposed;
 	}
 
+	// eslint-disable-next-line import/no-deprecated
 	private readonly _events = new TypedEventEmitter<IMigrationToolEvents>();
 	public get events(): IEventProvider<IMigrationToolEvents> {
 		return this._events;

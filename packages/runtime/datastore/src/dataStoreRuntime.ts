@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import { AttachState, IAudience } from "@fluidframework/container-definitions";
 import { IDeltaManager } from "@fluidframework/container-definitions/internal";
@@ -123,6 +124,7 @@ export interface ISharedObjectRegistry {
  * @alpha
  */
 export class FluidDataStoreRuntime
+	// eslint-disable-next-line import/no-deprecated
 	extends TypedEventEmitter<IFluidDataStoreRuntimeEvents>
 	implements IFluidDataStoreChannel, IFluidDataStoreRuntime, IFluidHandleContext
 {

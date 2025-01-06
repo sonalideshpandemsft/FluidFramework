@@ -46,6 +46,9 @@ export type TypedEventTransform<TThis, TEvent> =
  * Event Emitter helper class the supports emitting typed events.
  * @privateRemarks
  * This should become internal once the classes extending it become internal.
+ *
+ * @deprecated Use the new eventing library from `@fluid-internal/client-utils`.
+ *
  * @legacy
  * @alpha
  */
@@ -69,11 +72,26 @@ export class TypedEventEmitter<TEvent>
 		this.removeListener = super.removeListener.bind(this) as TypedEventTransform<this, TEvent>;
 		this.off = super.off.bind(this) as TypedEventTransform<this, TEvent>;
 	}
+	/**
+	 * @deprecated Use on and off from the new eventing library instead
+	 */
 	public readonly addListener: TypedEventTransform<this, TEvent>;
 	public readonly on: TypedEventTransform<this, TEvent>;
+	/**
+	 * @deprecated Use on and off from the new eventing library instead
+	 */
 	public readonly once: TypedEventTransform<this, TEvent>;
+	/**
+	 * @deprecated Use on and off from the new eventing library instead
+	 */
 	public readonly prependListener: TypedEventTransform<this, TEvent>;
+	/**
+	 * @deprecated Use on and off from the new eventing library instead
+	 */
 	public readonly prependOnceListener: TypedEventTransform<this, TEvent>;
+	/**
+	 * @deprecated Use on and off from the new eventing library instead
+	 */
 	public readonly removeListener: TypedEventTransform<this, TEvent>;
 	public readonly off: TypedEventTransform<this, TEvent>;
 }

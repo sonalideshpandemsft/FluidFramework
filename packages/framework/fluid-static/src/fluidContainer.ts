@@ -3,6 +3,7 @@
  * Licensed under the MIT License.
  */
 
+// eslint-disable-next-line import/no-deprecated
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import {
 	AttachState,
@@ -282,6 +283,7 @@ export function isInternalFluidContainer<TContainerSchema extends ContainerSchem
  * will need to utilize or provide a service-specific implementation of this type that implements that method.
  */
 class FluidContainer<TContainerSchema extends ContainerSchema = ContainerSchema>
+	// eslint-disable-next-line import/no-deprecated
 	extends TypedEventEmitter<IFluidContainerEvents>
 	implements IFluidContainer<TContainerSchema>, IFluidContainerInternal
 {
