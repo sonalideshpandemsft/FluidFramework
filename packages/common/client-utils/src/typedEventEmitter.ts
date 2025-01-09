@@ -47,7 +47,8 @@ export type TypedEventTransform<TThis, TEvent> =
  * @privateRemarks
  * This should become internal once the classes extending it become internal.
  *
- * @deprecated Use the new eventing library from `@fluid-internal/client-utils`.
+ * @deprecated Consider switching to the new eventing library which is in `CustomEventEmitter`.
+ * The goal is the remove `TypedEventEmitter` in Fluid Framework release 3.0 and switch to the new eventing library instead.
  *
  * @legacy
  * @alpha
@@ -71,6 +72,15 @@ export class TypedEventEmitter<TEvent>
 		>;
 		this.removeListener = super.removeListener.bind(this) as TypedEventTransform<this, TEvent>;
 		this.off = super.off.bind(this) as TypedEventTransform<this, TEvent>;
+
+		this.eventNames = super.eventNames.bind(this);
+		this.setMaxListeners = super.setMaxListeners.bind(this);
+		this.getMaxListeners = super.getMaxListeners.bind(this);
+		this.emit = super.emit.bind(this);
+		this.removeAllListeners = super.removeAllListeners.bind(this);
+		this.listeners = super.listeners.bind(this);
+		this.listenerCount = super.listenerCount.bind(this);
+		this.rawListeners = super.rawListeners.bind(this);
 	}
 	/**
 	 * @deprecated Use on and off from the new eventing library instead
@@ -94,4 +104,31 @@ export class TypedEventEmitter<TEvent>
 	 */
 	public readonly removeListener: TypedEventTransform<this, TEvent>;
 	public readonly off: TypedEventTransform<this, TEvent>;
+
+	/**
+	 * @deprecated Use on and off from the new eventing library instead
+	 */
+	public readonly eventNames: () => (string | number)[];
+	/**
+	 * @deprecated Use on and off from the new eventing library instead
+	 */
+	public readonly setMaxListeners: (type: number) => this;
+	/**
+	 * @deprecated Use on and off from the new eventing library instead
+	 */
+	public readonly getMaxListeners: () => number;
+	/**
+	 * @deprecated Use on and off from the new eventing library instead
+	 */
+	public readonly emit: (type: string | number, ...args: any[]) => boolean;
+	/**
+	 * @deprecated Use on and off from the new eventing library instead
+	 */
+	public readonly removeAllListeners: (type?: string | number) => this;
+	// public readonly listeners: (type: string | number) => void;
+	/**
+	 * @deprecated Use on and off from the new eventing library instead
+	 */
+	public readonly listenerCount: (type: string | number) => number;
+	// public readonly rawListeners: void;
 }

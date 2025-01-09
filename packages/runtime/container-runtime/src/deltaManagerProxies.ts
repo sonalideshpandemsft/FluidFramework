@@ -105,7 +105,7 @@ export abstract class BaseDeltaManagerProxy
 		super();
 
 		// We are expecting this class to have many listeners, so we suppress noisy "MaxListenersExceededWarning" logging.
-		super.setMaxListeners(0);
+		this.setMaxListeners(0);
 
 		this.deltaManager.on("prepareSend", this.onPrepareSend);
 		this.deltaManager.on("submitOp", this.onSubmitOp);

@@ -21,7 +21,7 @@ export class Audience extends TypedEventEmitter<IAudienceEvents> implements IAud
 	constructor() {
 		super();
 		// We are expecting this class to have many listeners, so we suppress noisy "MaxListenersExceededWarning" logging.
-		super.setMaxListeners(0);
+		this.setMaxListeners(0);
 	}
 
 	public getSelf(): ISelf | undefined {

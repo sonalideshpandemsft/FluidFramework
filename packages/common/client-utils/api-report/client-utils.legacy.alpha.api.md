@@ -14,6 +14,14 @@ export class TypedEventEmitter<TEvent> extends EventEmitter implements IEventPro
     constructor();
     // @deprecated (undocumented)
     readonly addListener: TypedEventTransform<this, TEvent>;
+    // @deprecated (undocumented)
+    readonly emit: (type: string | number, ...args: any[]) => boolean;
+    // @deprecated (undocumented)
+    readonly eventNames: () => (string | number)[];
+    // @deprecated (undocumented)
+    readonly getMaxListeners: () => number;
+    // @deprecated (undocumented)
+    readonly listenerCount: (type: string | number) => number;
     // (undocumented)
     readonly off: TypedEventTransform<this, TEvent>;
     // (undocumented)
@@ -25,7 +33,11 @@ export class TypedEventEmitter<TEvent> extends EventEmitter implements IEventPro
     // @deprecated (undocumented)
     readonly prependOnceListener: TypedEventTransform<this, TEvent>;
     // @deprecated (undocumented)
+    readonly removeAllListeners: (type?: string | number) => this;
+    // @deprecated (undocumented)
     readonly removeListener: TypedEventTransform<this, TEvent>;
+    // @deprecated (undocumented)
+    readonly setMaxListeners: (type: number) => this;
 }
 
 // @alpha (undocumented)
