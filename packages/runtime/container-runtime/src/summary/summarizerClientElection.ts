@@ -14,9 +14,8 @@ import {
 	ISerializedElection,
 	ITrackedClient,
 } from "./orderedClientElection.js";
+import { summarizerClientType } from "./summarizerTypes.js";
 import { ISummaryCollectionOpEvents } from "./summaryCollection.js";
-
-export const summarizerClientType = "summarizer";
 
 export interface ISummarizerClientElectionEvents extends IEvent {
 	(event: "electedSummarizerChanged", handler: () => void): void;
@@ -51,10 +50,10 @@ export class SummarizerClientElection
 	 */
 	private lastReportedSeq = 0;
 
-	public get electedClientId() {
+	public get electedClientId(): string | undefined {
 		return this.clientElection.electedClient?.clientId;
 	}
-	public get electedParentId() {
+	public get electedParentId(): string | undefined {
 		return this.clientElection.electedParent?.clientId;
 	}
 

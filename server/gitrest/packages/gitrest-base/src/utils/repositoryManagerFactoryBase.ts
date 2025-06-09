@@ -7,7 +7,9 @@ import { NetworkError } from "@fluidframework/server-services-client";
 import { Lumberjack } from "@fluidframework/server-services-telemetry";
 import { executeApiWithMetric } from "@fluidframework/server-services-utils";
 import { E_TIMEOUT, Mutex, MutexInterface, withTimeout } from "async-mutex";
+
 import { IExternalStorageManager } from "../externalStorageManager";
+
 import {
 	Constants,
 	IFileSystemManager,
@@ -306,8 +308,18 @@ export abstract class RepositoryManagerFactoryBase<TRepo> implements IRepository
 				});
 			} catch (e: any) {
 				if (e === E_TIMEOUT) {
+					Lumberjack.error(
+						"Mutex timeout when trying to run action",
+						lumberjackBaseProperties,
+						e,
+					);
 					throw new NetworkError(500, "Could not complete action due to mutex timeout.");
 				}
+				Lumberjack.error(
+					"Unknown error when trying to run action",
+					lumberjackBaseProperties,
+					e,
+				);
 				throw new NetworkError(
 					500,
 					`Unknown error when trying to run action:  ${e?.message}`,

@@ -15,9 +15,12 @@ import {
 	NetworkError,
 	WholeSummaryTreeEntry,
 } from "@fluidframework/server-services-client";
+import { Lumberjack } from "@fluidframework/server-services-telemetry";
+
 import { IRepositoryManager } from "../definitions";
-import { IFullGitTree } from "./definitions";
+
 import { Constants } from "./constants";
+import { IFullGitTree } from "./definitions";
 
 /**
  * A representation of an IFullGitTree in summary format that
@@ -254,5 +257,6 @@ export function convertWholeSummaryTreeEntryToSummaryObject(
 			unreferenced: (entry as IWholeSummaryTreeValueEntry).unreferenced,
 		};
 	}
+	Lumberjack.error("Unknown entry type", { entryType: entry.type });
 	throw new NetworkError(400, `Unknown entry type: ${entry.type}`);
 }

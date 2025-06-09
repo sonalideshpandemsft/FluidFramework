@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { assert, unreachableCase } from "@fluidframework/core-utils/internal";
+import { assert, unreachableCase, fail } from "@fluidframework/core-utils/internal";
 import type { Listenable } from "@fluidframework/core-interfaces/internal";
 import { createEmitter } from "@fluid-internal/client-utils";
 import type { IIdCompressor } from "@fluidframework/id-compressor";
@@ -11,7 +11,7 @@ import {
 	UsageError,
 	type ITelemetryLoggerExt,
 } from "@fluidframework/telemetry-utils/internal";
-import { noopValidator } from "../codec/index.js";
+import { FluidClientVersion, noopValidator } from "../codec/index.js";
 import {
 	type Anchor,
 	type AnchorLocator,
@@ -47,7 +47,7 @@ import {
 	type FieldBatchCodec,
 	type TreeCompressionStrategy,
 	buildForest,
-	createNodeKeyManager,
+	createNodeIdentifierManager,
 	intoDelta,
 	jsonableTreeFromCursor,
 	makeFieldBatchCodec,
@@ -60,7 +60,7 @@ import {
 	type SharedTreeBranchChange,
 	type Transactor,
 } from "../shared-tree-core/index.js";
-import { Breakable, disposeSymbol, fail, getOrCreate } from "../util/index.js";
+import { Breakable, disposeSymbol, getOrCreate, type WithBreakable } from "../util/index.js";
 
 import { SharedTreeChangeFamily, hasSchemaChange } from "./sharedTreeChangeFamily.js";
 import type { SharedTreeChange } from "./sharedTreeChangeTypes.js";
@@ -182,7 +182,7 @@ export interface TreeBranchFork extends BranchableTree, IDisposable {
  * API for interacting with a {@link SharedTreeBranch}.
  * Implementations of this interface must implement the {@link branchKey} property.
  */
-export interface ITreeCheckout extends AnchorLocator, ViewableTree {
+export interface ITreeCheckout extends AnchorLocator, ViewableTree, WithBreakable {
 	/**
 	 * Read and Write access for schema stored in the document.
 	 *
@@ -276,9 +276,13 @@ export function createTreeCheckout(
 		disposeForksAfterTransaction?: boolean;
 	},
 ): TreeCheckout {
-	const forest = args?.forest ?? buildForest();
+	const breaker = args?.breaker ?? new Breakable("TreeCheckout");
 	const schema = args?.schema ?? new TreeStoredSchemaRepository();
-	const defaultCodecOptions = { jsonValidator: noopValidator };
+	const forest = args?.forest ?? buildForest(breaker, schema);
+	const defaultCodecOptions = {
+		jsonValidator: noopValidator,
+		oldestCompatibleClient: FluidClientVersion.v2_0,
+	};
 	const defaultFieldBatchVersion = 1;
 	const changeFamily =
 		args?.changeFamily ??
@@ -286,7 +290,7 @@ export function createTreeCheckout(
 			revisionTagCodec,
 			args?.fieldBatchCodec ??
 				makeFieldBatchCodec(defaultCodecOptions, defaultFieldBatchVersion),
-			{ jsonValidator: noopValidator },
+			defaultCodecOptions,
 			args?.chunkCompressionStrategy,
 			idCompressor,
 		);
@@ -312,7 +316,7 @@ export function createTreeCheckout(
 		idCompressor,
 		args?.removedRoots,
 		args?.logger,
-		args?.breaker,
+		breaker,
 		args?.disposeForksAfterTransaction,
 	);
 }
@@ -391,7 +395,7 @@ export class TreeCheckout implements ITreeCheckoutFork {
 		),
 		/** Optional logger for telemetry. */
 		private readonly logger?: ITelemetryLoggerExt,
-		private readonly breaker: Breakable = new Breakable("TreeCheckout"),
+		public readonly breaker: Breakable = new Breakable("TreeCheckout"),
 		private readonly disposeForksAfterTransaction = true,
 	) {
 		this.#transaction = new SquashingTransactionStack(
@@ -518,7 +522,7 @@ export class TreeCheckout implements ITreeCheckoutFork {
 					// original (reinstated) schema.
 					this.storedSchema.apply(change.innerChange.schema.new);
 				} else {
-					fail("Unknown Shared Tree change type.");
+					fail(0xad1 /* Unknown Shared Tree change type. */);
 				}
 			}
 		}
@@ -549,15 +553,13 @@ export class TreeCheckout implements ITreeCheckoutFork {
 
 	private withCombinedVisitor(fn: (visitor: DeltaVisitor) => void): void {
 		const anchorVisitor = this.forest.anchors.acquireVisitor();
-		const combinedVisitor = combineVisitors(
-			[this.forest.acquireVisitor(), anchorVisitor],
-			[anchorVisitor],
-		);
+		const combinedVisitor = combineVisitors([this.forest.acquireVisitor(), anchorVisitor]);
 		fn(combinedVisitor);
 		combinedVisitor.free();
 	}
 
 	private checkNotDisposed(usageError?: string): void {
+		this.breaker.use();
 		if (this.disposed) {
 			if (usageError !== undefined) {
 				throw new UsageError(usageError);
@@ -658,8 +660,7 @@ export class TreeCheckout implements ITreeCheckoutFork {
 		const view = new SchematizingSimpleTreeView(
 			this,
 			config,
-			createNodeKeyManager(this.idCompressor),
-			this.breaker,
+			createNodeIdentifierManager(this.idCompressor),
 			() => {
 				this.views.delete(view);
 			},

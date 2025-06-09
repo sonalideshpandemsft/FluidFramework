@@ -4,6 +4,8 @@
  */
 
 import { IBlob, ICreateTreeEntry, ITree, ITreeEntry } from "@fluidframework/gitresources";
+import { getGitMode, getGitType } from "@fluidframework/protocol-base";
+import { SummaryType } from "@fluidframework/protocol-definitions";
 import {
 	IWholeSummaryBlob,
 	IWholeSummaryTree,
@@ -12,16 +14,17 @@ import {
 	NetworkError,
 	WholeSummaryTreeEntry,
 } from "@fluidframework/server-services-client";
-import { getGitMode, getGitType } from "@fluidframework/protocol-base";
-import { SummaryType } from "@fluidframework/protocol-definitions";
+import { Lumberjack } from "@fluidframework/server-services-telemetry";
+
 import { IRepositoryManager } from "../definitions";
-import { IFullGitTree } from "./definitions";
+
 import {
 	buildFullGitTreeFromGitTree,
 	convertFullGitTreeToFullSummaryTree,
 	convertFullSummaryToWholeSummaryEntries,
 	convertWholeSummaryTreeEntryToSummaryObject,
 } from "./conversions";
+import { IFullGitTree } from "./definitions";
 
 /**
  * Options and flags for writing a summary tree.
@@ -135,6 +138,7 @@ async function getShaFromTreeHandleEntry(
 	options: IWriteSummaryTreeOptions,
 ): Promise<string> {
 	if (!entry.id) {
+		Lumberjack.error("Empty summary tree handle");
 		throw new NetworkError(400, `Empty summary tree handle`);
 	}
 	if (entry.id.split("/").length === 1) {
@@ -175,6 +179,10 @@ async function getShaFromTreeHandleEntry(
 	}
 	const sha = options.entryHandleToObjectShaCache.get(entry.id);
 	if (!sha) {
+		Lumberjack.error("Summary tree handle object not found", {
+			id: entry.id,
+			path: entry.path,
+		});
 		throw new NetworkError(
 			404,
 			`Summary tree handle object not found: id: ${entry.id}, path: ${entry.path}`,

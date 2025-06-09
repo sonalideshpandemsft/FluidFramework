@@ -3,38 +3,39 @@
  * Licensed under the MIT License.
  */
 
-import assert from "assert";
-import express from "express";
-import request from "supertest";
-import nconf from "nconf";
-import { TypedEventEmitter } from "@fluidframework/common-utils";
-import { Lumberjack, TestEngine1 } from "@fluidframework/server-services-telemetry";
-import { ICollaborationSessionEvents } from "@fluidframework/server-lambdas";
-import {
-	TestTenantManager,
-	TestThrottler,
-	TestDocumentStorage,
-	TestDbFactory,
-	TestProducer,
-	TestKafka,
-	TestNotImplementedDocumentRepository,
-	TestClusterDrainingStatusChecker,
-} from "@fluidframework/server-test-utils";
+import { ScopeType } from "@fluidframework/protocol-definitions";
+import { IAlfredTenant, NetworkError } from "@fluidframework/server-services-client";
 import {
 	IDocument,
 	MongoDatabaseManager,
 	MongoManager,
 } from "@fluidframework/server-services-core";
-import * as alfredApp from "../../alfred/app";
-import { IAlfredTenant } from "@fluidframework/server-services-client";
-import { ScopeType } from "@fluidframework/protocol-definitions";
-import { generateToken } from "@fluidframework/server-services-utils";
-import { TestCache, TestFluidAccessTokenGenerator } from "@fluidframework/server-test-utils";
-import { DeltaService, DocumentDeleteService } from "../../alfred/services";
-import * as SessionHelper from "../../utils/sessionHelper";
-import Sinon from "sinon";
-import { Constants } from "../../utils";
 import { StartupCheck } from "@fluidframework/server-services-shared";
+import { Lumberjack, TestEngine1 } from "@fluidframework/server-services-telemetry";
+import { generateToken } from "@fluidframework/server-services-utils";
+import {
+	TestCache,
+	TestClusterDrainingStatusChecker,
+	TestDbFactory,
+	TestDocumentStorage,
+	TestFluidAccessTokenGenerator,
+	TestKafka,
+	TestNotImplementedDocumentRepository,
+	TestProducer,
+	TestRedisClientConnectionManager,
+	TestTenantManager,
+	TestThrottler,
+} from "@fluidframework/server-test-utils";
+import assert from "assert";
+import express from "express";
+import nconf from "nconf";
+import Sinon from "sinon";
+import request from "supertest";
+import { Emitter as RedisEmitter } from "@socket.io/redis-emitter";
+import * as alfredApp from "../../alfred/app";
+import { DeltaService, DocumentDeleteService } from "../../alfred/services";
+import { Constants } from "../../utils";
+import * as SessionHelper from "../../utils/sessionHelper";
 
 const nodeCollectionName = "testNodes";
 const documentsCollectionName = "testDocuments";
@@ -87,6 +88,13 @@ describe("Routerlicious", () => {
 				tenantId: appTenant1.id,
 				documentId: "doc-1",
 				content: "Hello, World!",
+				session: {
+					ordererUrl: defaultProvider.get("worker:serverUrl"),
+					deltaStreamUrl: defaultProvider.get("worker:deltaStreamUrl"),
+					historianUrl: defaultProvider.get("worker:blobStorageUrl"),
+					isSessionAlive: true,
+					isSessionActive: true,
+				},
 			};
 			const defaultDbFactory = new TestDbFactory({
 				[documentsCollectionName]: [document1],
@@ -140,8 +148,10 @@ describe("Routerlicious", () => {
 			const defaultDeltaService = new DeltaService(deltasCollection, defaultTenantManager);
 			const defaultDocumentRepository = new TestNotImplementedDocumentRepository();
 			const defaultDocumentDeleteService = new DocumentDeleteService();
-			const defaultCollaborationSessionEventEmitter =
-				new TypedEventEmitter<ICollaborationSessionEvents>();
+			const defaultRedisClientConnectionManager = new TestRedisClientConnectionManager();
+			const defaultCollaborationSessionEventEmitter = new RedisEmitter(
+				defaultRedisClientConnectionManager.getRedisClient(),
+			);
 			let app: express.Application;
 			let supertest: request.SuperTest<request.Test>;
 			let testFluidAccessTokenGenerator: TestFluidAccessTokenGenerator;
@@ -264,6 +274,14 @@ describe("Routerlicious", () => {
 						await assertThrottle(
 							`/api/v1/${appTenant1.id}/${document1._id}/blobs`,
 							undefined,
+							undefined,
+							"post",
+						);
+					});
+					it("/api/v1/:tenantId/:id/broadcast-signal", async () => {
+						await assertThrottle(
+							`/api/v1/${appTenant1.id}/${document1._id}/broadcast-signal`,
+							"Bearer 12345", // Dummy bearer token
 							undefined,
 							"post",
 						);
@@ -939,6 +957,57 @@ describe("Routerlicious", () => {
 				});
 			});
 
+			describe("/deltas-errorHandling", () => {
+				let getDeltasStub;
+
+				afterEach(() => {
+					// Restore the original method after each test
+					if (getDeltasStub) getDeltasStub.restore();
+				});
+
+				it("should return 404 when document is not found", async () => {
+					getDeltasStub = Sinon.stub(DeltaService.prototype, "getDeltas").rejects(
+						new NetworkError(404, "Document not found"),
+					);
+
+					const response = await supertest
+						.get(`/deltas/raw/${appTenant1.id}/${document1._id}`)
+						.set("Authorization", tenantToken1)
+						.expect(404);
+
+					assert.strictEqual(response.status, 404);
+					assert.strictEqual(response.body, "Document not found");
+				});
+
+				it("should return 500 when an internal Non-network error occurs", async () => {
+					getDeltasStub = Sinon.stub(DeltaService.prototype, "getDeltas").rejects(
+						new Error("Internal Error 499"),
+					); // Not a NetworkError, simulating an internal issue
+
+					const response = await supertest
+						.get(`/deltas/raw/${appTenant1.id}/${document1._id}`)
+						.set("Authorization", tenantToken1)
+						.expect(500);
+
+					assert.strictEqual(response.status, 500);
+					assert.strictEqual(response.body, "Internal Server Error"); // Modify based on actual error handling
+				});
+
+				it("should return 500 when an internal 500 error occurs", async () => {
+					getDeltasStub = Sinon.stub(DeltaService.prototype, "getDeltas").rejects(
+						new NetworkError(500, "Internal Server Error"),
+					);
+
+					const response = await supertest
+						.get(`/deltas/raw/${appTenant1.id}/${document1._id}`)
+						.set("Authorization", tenantToken1)
+						.expect(500);
+
+					assert.strictEqual(response.status, 500);
+					assert.strictEqual(response.body, "Internal Server Error");
+				});
+			});
+
 			describe("functionality", () => {
 				const maxThrottlerLimit = 10;
 				beforeEach(() => {
@@ -1006,6 +1075,10 @@ describe("Routerlicious", () => {
 						testFluidAccessTokenGenerator,
 					);
 					supertest = request(app);
+				});
+
+				afterEach(() => {
+					Sinon.restore();
 				});
 
 				describe("/api/v1", () => {
@@ -1076,6 +1149,141 @@ describe("Routerlicious", () => {
 							.set("Authorization", tenantToken1)
 							.set("Content-Type", "application/json")
 							.expect(400);
+					});
+
+					it("Successful request with redirect", async () => {
+						const body = {
+							signalContent: {
+								contents: {
+									type: "ExternalDataChanged_V1.0.0",
+									content: { taskListId: "task-list-1" },
+								},
+							},
+						};
+						const documentHostedInOtherUrl = {
+							_id: "doc-1",
+							tenantId: appTenant1.id,
+							version: "1.0",
+							documentId: "doc-1",
+							content: "Hello, World!",
+							session: {
+								ordererUrl: "http://localhost:3006",
+								deltaStreamUrl: defaultProvider.get("worker:deltaStreamUrl"),
+								historianUrl: defaultProvider.get("worker:blobStorageUrl"),
+								isSessionAlive: true,
+								isSessionActive: true,
+							},
+							createTime: Date.now(),
+							scribe: "",
+							deli: "",
+						};
+
+						Sinon.stub(defaultStorage, "getDocument").returns(
+							Promise.resolve(documentHostedInOtherUrl),
+						);
+
+						await supertest
+							.post(
+								`/api/v1/${appTenant1.id}/${documentHostedInOtherUrl._id}/broadcast-signal`,
+							)
+							.send(body)
+							.set("Authorization", tenantToken1)
+							.set("Content-Type", "application/json")
+							.expect(302);
+					});
+
+					it("Document not found", async () => {
+						const body = {
+							signalContent: {
+								contents: {
+									type: "ExternalDataChanged_V1.0.0",
+									content: { taskListId: "task-list-1" },
+								},
+							},
+						};
+
+						const documentNotFound = {
+							_id: "doc-1",
+							tenantId: appTenant1.id,
+							version: "1.0",
+							documentId: "doc-1",
+							content: "Hello, World!",
+							session: {
+								ordererUrl: defaultProvider.get("worker:serverUrl"),
+								deltaStreamUrl: defaultProvider.get("worker:deltaStreamUrl"),
+								historianUrl: defaultProvider.get("worker:blobStorageUrl"),
+								isSessionAlive: false,
+								isSessionActive: false,
+							},
+							createTime: Date.now(),
+							scribe: "",
+							deli: "",
+						};
+
+						Sinon.stub(defaultStorage, "getDocument")
+							.onFirstCall()
+							.returns(Promise.resolve(null))
+							.onSecondCall()
+							.returns(Promise.resolve(documentNotFound));
+
+						await supertest
+							.post(
+								`/api/v1/${appTenant1.id}/${documentNotFound._id}/broadcast-signal`,
+							)
+							.send(body)
+							.set("Authorization", tenantToken1)
+							.set("Content-Type", "application/json")
+							.expect(404);
+
+						await supertest
+							.post(
+								`/api/v1/${appTenant1.id}/${documentNotFound._id}/broadcast-signal`,
+							)
+							.send(body)
+							.set("Authorization", tenantToken1)
+							.set("Content-Type", "application/json")
+							.expect(404);
+					});
+
+					it("Document session not active", async () => {
+						const body = {
+							signalContent: {
+								contents: {
+									type: "ExternalDataChanged_V1.0.0",
+									content: { taskListId: "task-list-1" },
+								},
+							},
+						};
+						const documentNoActiveSession = {
+							_id: "doc-1",
+							tenantId: appTenant1.id,
+							version: "1.0",
+							documentId: "doc-1",
+							content: "Hello, World!",
+							session: {
+								ordererUrl: defaultProvider.get("worker:serverUrl"),
+								deltaStreamUrl: defaultProvider.get("worker:deltaStreamUrl"),
+								historianUrl: defaultProvider.get("worker:blobStorageUrl"),
+								isSessionAlive: true,
+								isSessionActive: false,
+							},
+							createTime: Date.now(),
+							scribe: "",
+							deli: "",
+						};
+
+						Sinon.stub(defaultStorage, "getDocument").returns(
+							Promise.resolve(documentNoActiveSession),
+						);
+
+						await supertest
+							.post(
+								`/api/v1/${appTenant1.id}/${documentNoActiveSession._id}/broadcast-signal`,
+							)
+							.send(body)
+							.set("Authorization", tenantToken1)
+							.set("Content-Type", "application/json")
+							.expect(410);
 					});
 				});
 

@@ -3,7 +3,7 @@
  * Licensed under the MIT License.
  */
 
-import { TypedEventEmitter, performance } from "@fluid-internal/client-utils";
+import { TypedEventEmitter, performanceNow } from "@fluid-internal/client-utils";
 import { IEvent } from "@fluidframework/core-interfaces";
 import { assert, Deferred } from "@fluidframework/core-utils/internal";
 import { DocumentDeltaConnection } from "@fluidframework/driver-base/internal";
@@ -245,6 +245,7 @@ export class OdspDocumentDeltaConnection extends DocumentDeltaConnection {
 	 * @param timeoutMs - time limit on making the connection
 	 * @param epochTracker - track epoch changes
 	 * @param socketReferenceKeyPrefix - (optional) prefix to isolate socket reuse cache
+	 * @param connectionId - (optional) connection ID for the connection
 	 */
 	public static async create(
 		tenantId: string,
@@ -257,6 +258,7 @@ export class OdspDocumentDeltaConnection extends DocumentDeltaConnection {
 		timeoutMs: number,
 		epochTracker: EpochTracker,
 		socketReferenceKeyPrefix: string | undefined,
+		connectionId: string = uuid(),
 	): Promise<OdspDocumentDeltaConnection> {
 		const mc = loggerToMonitoringContext(telemetryLogger);
 
@@ -281,7 +283,6 @@ export class OdspDocumentDeltaConnection extends DocumentDeltaConnection {
 		);
 
 		const socket = socketReference.socket;
-		const connectionId = uuid();
 		const connectMessage: IConnect = {
 			client,
 			id: documentId,
@@ -450,7 +451,7 @@ export class OdspDocumentDeltaConnection extends DocumentDeltaConnection {
 
 		this.pushCallCounter++;
 		const nonce = `${this.requestOpsNoncePrefix}${this.pushCallCounter}`;
-		const start = performance.now();
+		const start = performanceNow();
 
 		// We may keep keep accumulating memory for nothing, if we are not getting responses.
 		// Note that we should not have overlapping requests, as DeltaManager allows only one
@@ -475,7 +476,7 @@ export class OdspDocumentDeltaConnection extends DocumentDeltaConnection {
 				from: payloadToDelete.from,
 				to: payloadToDelete.to,
 				length: payloadToDelete.to - payloadToDelete.from,
-				duration: performance.now() - payloadToDelete.start,
+				duration: performanceNow() - payloadToDelete.start,
 			});
 			this.getOpsMap.delete(key!);
 		}
@@ -591,7 +592,7 @@ export class OdspDocumentDeltaConnection extends DocumentDeltaConnection {
 					code: result.code,
 					from: data?.from,
 					to: data?.to,
-					duration: data === undefined ? undefined : performance.now() - data.start,
+					duration: data === undefined ? undefined : performanceNow() - data.start,
 				};
 				if (messages !== undefined && messages.length > 0) {
 					this.logger.sendPerformanceEvent({

@@ -3,20 +3,28 @@
  * Licensed under the MIT License.
  */
 
-import type { IEvent, IEventProvider, IFluidLoadable } from "@fluidframework/core-interfaces";
-import type { IFluidDataStoreFactory } from "@fluidframework/runtime-definitions/internal";
+import type { DataObjectKind } from "@fluidframework/aqueduct/internal";
+import type { ContainerExtensionStore } from "@fluidframework/container-runtime-definitions/internal";
+import type {
+	IEvent,
+	IEventProvider,
+	IFluidHandle,
+	IFluidLoadable,
+} from "@fluidframework/core-interfaces";
 import type { SharedObjectKind } from "@fluidframework/shared-object-base";
 import type { ISharedObjectKind } from "@fluidframework/shared-object-base/internal";
 
 /**
- * Valid compatibility modes that may be specified when creating a DOProviderContainerRuntimeFactory.
+ * Determines the set of runtime options that Fluid Framework will use when running.
+ * In "1" mode we support full interop between 2.x clients and 1.x clients,
+ * while in "2" mode we only support interop between 2.x clients.
+ *
  * @public
  */
 export type CompatibilityMode = "1" | "2";
 
 /**
  * A mapping of string identifiers to instantiated `DataObject`s or `SharedObject`s.
- * @internal
  */
 export type LoadableObjectRecord = Record<string, IFluidLoadable>;
 
@@ -24,12 +32,12 @@ export type LoadableObjectRecord = Record<string, IFluidLoadable>;
  * A mapping of string identifiers to classes that will later be used to instantiate a corresponding `DataObject`
  * or `SharedObject`.
  */
-export type LoadableObjectClassRecord = Record<string, SharedObjectKind>;
+export type LoadableObjectKindRecord = Record<string, SharedObjectKind>;
 
 /**
- * A class object of `DataObject` or `SharedObject`.
+ * A kind of `DataObject` or `SharedObject`.
  *
- * @typeParam T - The class of the `DataObject` or `SharedObject`.
+ * @typeParam T - The kind of `DataObject` or `SharedObject`.
  *
  * @privateRemarks
  * There are some edge cases in TypeScript where the order of the members in a union matter.
@@ -38,24 +46,9 @@ export type LoadableObjectClassRecord = Record<string, SharedObjectKind>;
  * In this case placing ISharedObjectKind fixed one usage and didn't break anything, and generally seems more likely to work than the reverse, so this is the order being used.
  * This is likely (a bug in TypeScript)[https://github.com/microsoft/TypeScript/issues/45809].
  */
-export type LoadableObjectClass<T extends IFluidLoadable = IFluidLoadable> =
+export type LoadableObjectKind<T extends IFluidLoadable = IFluidLoadable> =
 	| ISharedObjectKind<T>
-	| DataObjectClass<T>;
-
-/**
- * A class that has a factory that can create a `DataObject` and a
- * constructor that will return the type of the `DataObject`.
- *
- * @typeParam T - The class of the `DataObject`.
- * @privateRemarks
- * Having both `factory` and constructor is redundant.
- * TODO: It appears the factory is what's used, so the constructor should be removed once factory provides strong typing.
- */
-export interface DataObjectClass<T extends IFluidLoadable> {
-	readonly factory: IFluidDataStoreFactory;
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	new (...args: any[]): T;
-}
+	| DataObjectKind<T>;
 
 /**
  * Represents properties that can be attached to a container.
@@ -107,18 +100,10 @@ export interface ContainerSchema {
 }
 
 /**
- * @internal
- */
-export interface IProvideRootDataObject {
-	readonly IRootDataObject: IRootDataObject;
-}
-
-/**
  * Holds the collection of objects that the container was initially created with, as well as provides the ability
  * to dynamically create further objects during usage.
- * @internal
  */
-export interface IRootDataObject extends IProvideRootDataObject {
+export interface IRootDataObject {
 	/**
 	 * Provides a record of the initial objects defined on creation.
 	 */
@@ -132,6 +117,28 @@ export interface IRootDataObject extends IProvideRootDataObject {
 	 * @typeParam T - The class of the `DataObject` or `SharedObject`.
 	 */
 	create<T>(objectClass: SharedObjectKind<T>): Promise<T>;
+
+	/**
+	 * Upload a blob of data.
+	 * Although it is marked as internal, there is external usage of this function for experimental purposes.
+	 * Please contact yunho-microsoft or vladsud if you need to change it.
+	 * @param blob - blob to be uploaded.
+	 *
+	 * @remarks This method is used to expose uploadBlob to the IFluidContainer level. UploadBlob will upload data to server side (as of now, ODSP only). There is no downloadBlob provided as it is not needed(blob lifetime managed by server).
+	 */
+	uploadBlob(blob: ArrayBufferLike): Promise<IFluidHandle<ArrayBufferLike>>;
+}
+
+interface IProvideStaticEntryPoint {
+	readonly IStaticEntryPoint: IStaticEntryPoint;
+}
+
+/**
+ * This is the internal entry point fluid-static creates.
+ */
+export interface IStaticEntryPoint extends IProvideStaticEntryPoint {
+	readonly rootDataObject: IRootDataObject;
+	readonly extensionStore: ContainerExtensionStore;
 }
 
 /**

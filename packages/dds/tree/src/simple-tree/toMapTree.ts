@@ -3,53 +3,53 @@
  * Licensed under the MIT License.
  */
 
-import { assert } from "@fluidframework/core-utils/internal";
+import { assert, fail, unreachableCase } from "@fluidframework/core-utils/internal";
 import { UsageError } from "@fluidframework/telemetry-utils/internal";
 import { isFluidHandle } from "@fluidframework/runtime-utils/internal";
 
 import {
 	EmptyKey,
 	type FieldKey,
-	type MapTree,
+	type NodeData,
 	type TreeValue,
 	type ValueSchema,
-	type SchemaAndPolicy,
-	type ExclusiveMapTree,
 } from "../core/index.js";
-import {
-	isTreeValue,
-	valueSchemaAllows,
-	type NodeKeyManager,
-} from "../feature-libraries/index.js";
-import { brand, fail, isReadonlyArray, find, hasSome, hasSingle } from "../util/index.js";
+import { FieldKinds, isTreeValue, valueSchemaAllows } from "../feature-libraries/index.js";
+import { brand, isReadonlyArray, hasSingle } from "../util/index.js";
 
 import { nullSchema } from "./leafNodeSchema.js";
 import {
-	type FieldSchema,
 	type ImplicitAllowedTypes,
 	normalizeAllowedTypes,
-	extractFieldProvider,
 	isConstant,
-	type FieldProvider,
 	type ImplicitFieldSchema,
 	normalizeFieldSchema,
 	FieldKind,
 	type TreeLeafValue,
+	extractFieldProvider,
+	type ContextualFieldProvider,
 } from "./schemaTypes.js";
 import {
 	getKernel,
-	getSimpleNodeSchemaFromInnerNode,
 	isTreeNode,
 	NodeKind,
-	type InnerNode,
 	type TreeNode,
 	type TreeNodeSchema,
 	type Unhydrated,
 	UnhydratedFlexTreeNode,
+	UnhydratedSequenceField,
 } from "./core/index.js";
-import { SchemaValidationErrors, isNodeInSchema } from "../feature-libraries/index.js";
-import { isObjectNodeSchema } from "./objectNodeTypes.js";
+// Required to prevent the introduction of new circular dependencies
+// TODO: Having the schema provide their own policy functions for compatibility which
+// toMapTree invokes instead of manually handling each kind would remove this bad
+// dependency, and reduce coupling.
+// eslint-disable-next-line import/no-internal-modules
+import { isObjectNodeSchema } from "./node-kinds/object/objectNodeTypes.js";
 import type { IFluidHandle } from "@fluidframework/core-interfaces";
+// eslint-disable-next-line import/no-internal-modules
+import { createField, type UnhydratedFlexTreeField } from "./core/unhydratedFlexTree.js";
+import { convertFieldKind } from "./toStoredSchema.js";
+import { getUnhydratedContext } from "./createContext.js";
 
 /**
  * Module notes:
@@ -85,40 +85,12 @@ import type { IFluidHandle } from "@fluidframework/core-interfaces";
  * @param schemaValidationPolicy - The stored schema and policy to be used for validation, if the policy says schema
  * validation should happen. If it does, the input tree will be validated against this schema + policy, and an error will
  * be thrown if the tree does not conform to the schema. If undefined, no validation against the stored schema is done.
- *
- * TODO:BUG: AB#9131
- * This schema validation is done before defaults are provided.
- * This can not easily be fixed by reordering things within this implementation since even at the end of this function defaults requiring a context may not have been filled.
- * This means schema validation reject required fields getting their value from a default like identifier fields.
- *
  * @remarks The resulting tree will be populated with any defaults from {@link FieldProvider}s in the schema.
- *
- * @privateRemarks
- * TODO: AB#9126 AB#9131
- * When an app wants schema validation, we should ensure data is validated. Doing the validation here is not robust (since many callers to this don't have a context and thus can't opt into validation).
- * Additionally the validation here does not correctly handle default values, and introduces a second schema representation which is a bit odd API wise as its typically derivable from the view schema.
- * It may make more sense to validate when hydrating the MapTreeNode when the context is known and the defaults are available.
- * Applying the "parse don't validate" idiom here could help ensuring we capture when the validation optionally happens in the type system to avoid missing or redundant validation,
- * as well as ensuring validation happens after defaulting (or can handle validating data missing defaults)
  */
-export function mapTreeFromNodeData(
-	data: InsertableContent,
-	allowedTypes: ImplicitAllowedTypes,
-	context?: NodeKeyManager,
-	schemaValidationPolicy?: SchemaAndPolicy,
-): ExclusiveMapTree;
-export function mapTreeFromNodeData(
-	data: InsertableContent | undefined,
+export function mapTreeFromNodeData<TIn extends InsertableContent | undefined>(
+	data: TIn,
 	allowedTypes: ImplicitFieldSchema,
-	context?: NodeKeyManager,
-	schemaValidationPolicy?: SchemaAndPolicy,
-): ExclusiveMapTree | undefined;
-export function mapTreeFromNodeData(
-	data: InsertableContent | undefined,
-	allowedTypes: ImplicitFieldSchema,
-	context?: NodeKeyManager,
-	schemaValidationPolicy?: SchemaAndPolicy,
-): ExclusiveMapTree | undefined {
+): TIn extends undefined ? undefined : UnhydratedFlexTreeNode {
 	const normalizedFieldSchema = normalizeFieldSchema(allowedTypes);
 
 	if (data === undefined) {
@@ -126,24 +98,15 @@ export function mapTreeFromNodeData(
 		if (normalizedFieldSchema.kind !== FieldKind.Optional) {
 			throw new UsageError("Got undefined for non-optional field.");
 		}
-		return undefined;
+		return undefined as TIn extends undefined ? undefined : UnhydratedFlexTreeNode;
 	}
 
-	const mapTree = nodeDataToMapTree(data, normalizedFieldSchema.allowedTypeSet);
-	// Add what defaults can be provided. If no `context` is providing, some defaults may still be missing.
-	addDefaultsToMapTree(mapTree, normalizedFieldSchema.allowedTypes, context);
+	const mapTree: UnhydratedFlexTreeNode = nodeDataToMapTree(
+		data,
+		normalizedFieldSchema.allowedTypeSet,
+	);
 
-	if (schemaValidationPolicy?.policy.validateSchema === true) {
-		// TODO: BUG: AB#9131
-		// Since some defaults may still be missing, this can give false positives when context is undefined but schemaValidationPolicy is provided.
-		// For now disable this check when context is undefined:
-		if (context !== undefined) {
-			const maybeError = isNodeInSchema(mapTree, schemaValidationPolicy);
-			inSchemaOrThrow(maybeError);
-		}
-	}
-
-	return mapTree;
+	return mapTree as TIn extends undefined ? undefined : UnhydratedFlexTreeNode;
 }
 
 /**
@@ -156,32 +119,24 @@ export function mapTreeFromNodeData(
 function nodeDataToMapTree(
 	data: InsertableContent,
 	allowedTypes: ReadonlySet<TreeNodeSchema>,
-): ExclusiveMapTree {
-	// A special cache path for processing unhydrated nodes.
-	// They already have the mapTree, so there is no need to recompute it.
-	const innerNode = tryGetInnerNode(data);
-	if (innerNode !== undefined) {
-		if (innerNode instanceof UnhydratedFlexTreeNode) {
-			if (!allowedTypes.has(getSimpleNodeSchemaFromInnerNode(innerNode))) {
-				throw new UsageError("Invalid schema for this context.");
-			}
-			// TODO: mapTreeFromNodeData modifies the trees it gets to add defaults.
-			// Using a cached value here can result in this tree having defaults applied to it more than once.
-			// This is unnecessary and inefficient, but should be a no-op if all calls provide the same context (which they might not).
-			// A cleaner design (avoiding this cast) might be to apply defaults eagerly if they don't need a context, and lazily (when hydrating) if they do.
-			// This could avoid having to mutate the map tree to apply defaults, removing the need for this cast.
-			return innerNode.mapTree;
-		} else {
+): UnhydratedFlexTreeNode {
+	if (isTreeNode(data)) {
+		const kernel = getKernel(data);
+		const inner = kernel.getInnerNodeIfUnhydrated();
+		if (inner === undefined) {
 			// The node is already hydrated, meaning that it already got inserted into the tree previously
 			throw new UsageError("A node may not be inserted into the tree more than once");
+		} else {
+			if (!allowedTypes.has(kernel.schema)) {
+				throw new UsageError("Invalid schema for this context.");
+			}
+			return inner;
 		}
 	}
 
-	assert(!isTreeNode(data), 0xa23 /* data without an inner node cannot be TreeNode */);
-
 	const schema = getType(data, allowedTypes);
 
-	let result: ExclusiveMapTree;
+	let result: FlexContent;
 	switch (schema.kind) {
 		case NodeKind.Leaf:
 			result = leafToMapTree(data, schema, allowedTypes);
@@ -196,20 +151,13 @@ function nodeDataToMapTree(
 			result = objectToMapTree(data, schema);
 			break;
 		default:
-			fail(`Unrecognized schema kind: ${schema.kind}.`);
+			unreachableCase(schema.kind);
 	}
 
-	return result;
+	return new UnhydratedFlexTreeNode(...result, getUnhydratedContext(schema));
 }
 
-/**
- * Throws a UsageError if maybeError indicates a tree is out of schema.
- */
-export function inSchemaOrThrow(maybeError: SchemaValidationErrors): void {
-	if (maybeError !== SchemaValidationErrors.NoError) {
-		throw new UsageError("Tree does not conform to schema.");
-	}
-}
+type FlexContent = [NodeData, Map<FieldKey, UnhydratedFlexTreeField>];
 
 /**
  * Transforms data under a Leaf schema.
@@ -222,7 +170,7 @@ function leafToMapTree(
 	data: FactoryContent,
 	schema: TreeNodeSchema,
 	allowedTypes: ReadonlySet<TreeNodeSchema>,
-): ExclusiveMapTree {
+): FlexContent {
 	assert(schema.kind === NodeKind.Leaf, 0x921 /* Expected a leaf schema. */);
 	if (!isTreeValue(data)) {
 		// This rule exists to protect against useless `toString` output like `[object Object]`.
@@ -239,11 +187,13 @@ function leafToMapTree(
 		0x84a /* Unsupported schema for provided primitive. */,
 	);
 
-	return {
-		value: mappedValue,
-		type: brand(mappedSchema.identifier),
-		fields: new Map(),
-	};
+	return [
+		{
+			value: mappedValue,
+			type: brand(mappedSchema.identifier),
+		},
+		new Map<FieldKey, UnhydratedFlexTreeField>(),
+	];
 }
 
 /**
@@ -299,7 +249,7 @@ function mapValueWithFallbacks(
 function arrayChildToMapTree(
 	child: InsertableContent,
 	allowedTypes: ReadonlySet<TreeNodeSchema>,
-): ExclusiveMapTree {
+): UnhydratedFlexTreeNode {
 	// We do not support undefined sequence entries.
 	// If we encounter an undefined entry, use null instead if supported by the schema, otherwise throw.
 	let childWithFallback = child;
@@ -321,7 +271,7 @@ function arrayChildToMapTree(
  * validation should happen. If it does, the input tree will be validated against this schema + policy, and an error will
  * be thrown if the tree does not conform to the schema. If undefined, no validation against the stored schema is done.
  */
-function arrayToMapTree(data: FactoryContent, schema: TreeNodeSchema): ExclusiveMapTree {
+function arrayToMapTree(data: FactoryContent, schema: TreeNodeSchema): FlexContent {
 	assert(schema.kind === NodeKind.Array, 0x922 /* Expected an array schema. */);
 	if (!(typeof data === "object" && data !== null && Symbol.iterator in data)) {
 		throw new UsageError(`Input data is incompatible with Array schema: ${data}`);
@@ -333,13 +283,30 @@ function arrayToMapTree(data: FactoryContent, schema: TreeNodeSchema): Exclusive
 		arrayChildToMapTree(child, allowedChildTypes),
 	);
 
-	// Array nodes have a single `EmptyKey` field:
-	const fieldsEntries = mappedData.length === 0 ? [] : ([[EmptyKey, mappedData]] as const);
+	const context = getUnhydratedContext(schema).flexContext;
 
-	return {
-		type: brand(schema.identifier),
-		fields: new Map(fieldsEntries),
-	};
+	// Array nodes have a single `EmptyKey` field:
+	const fieldsEntries =
+		mappedData.length === 0
+			? []
+			: ([
+					[
+						EmptyKey,
+						new UnhydratedSequenceField(
+							context,
+							FieldKinds.sequence.identifier,
+							EmptyKey,
+							mappedData,
+						),
+					],
+				] as const);
+
+	return [
+		{
+			type: brand(schema.identifier),
+		},
+		new Map(fieldsEntries),
+	];
 }
 
 /**
@@ -350,7 +317,7 @@ function arrayToMapTree(data: FactoryContent, schema: TreeNodeSchema): Exclusive
  * validation should happen. If it does, the input tree will be validated against this schema + policy, and an error will
  * be thrown if the tree does not conform to the schema. If undefined, no validation against the stored schema is done.
  */
-function mapToMapTree(data: FactoryContent, schema: TreeNodeSchema): ExclusiveMapTree {
+function mapToMapTree(data: FactoryContent, schema: TreeNodeSchema): FlexContent {
 	assert(schema.kind === NodeKind.Map, 0x923 /* Expected a Map schema. */);
 	if (!(typeof data === "object" && data !== null)) {
 		throw new UsageError(`Input data is incompatible with Map schema: ${data}`);
@@ -366,7 +333,9 @@ function mapToMapTree(data: FactoryContent, schema: TreeNodeSchema): ExclusiveMa
 				Object.entries(data)
 	) as Iterable<readonly [string, InsertableContent]>;
 
-	const transformedFields = new Map<FieldKey, ExclusiveMapTree[]>();
+	const context = getUnhydratedContext(schema).flexContext;
+
+	const transformedFields = new Map<FieldKey, UnhydratedFlexTreeField>();
 	for (const item of fieldsIterator) {
 		if (!isReadonlyArray(item) || item.length !== 2 || typeof item[0] !== "string") {
 			throw new UsageError(`Input data is incompatible with map entry: ${item}`);
@@ -376,15 +345,18 @@ function mapToMapTree(data: FactoryContent, schema: TreeNodeSchema): ExclusiveMa
 
 		// Omit undefined values - an entry with an undefined value is equivalent to one that has been removed or omitted
 		if (value !== undefined) {
-			const mappedField = nodeDataToMapTree(value, allowedChildTypes);
-			transformedFields.set(brand(key), [mappedField]);
+			const child = nodeDataToMapTree(value, allowedChildTypes);
+			const field = createField(context, FieldKinds.optional.identifier, brand(key), [child]);
+			transformedFields.set(brand(key), field);
 		}
 	}
 
-	return {
-		type: brand(schema.identifier),
-		fields: transformedFields,
-	};
+	return [
+		{
+			type: brand(schema.identifier),
+		},
+		transformedFields,
+	];
 }
 
 /**
@@ -392,7 +364,7 @@ function mapToMapTree(data: FactoryContent, schema: TreeNodeSchema): ExclusiveMa
  * @param data - The tree data to be transformed. Must be a Record-like object.
  * @param schema - The schema associated with the value.
  */
-function objectToMapTree(data: FactoryContent, schema: TreeNodeSchema): ExclusiveMapTree {
+function objectToMapTree(data: FactoryContent, schema: TreeNodeSchema): FlexContent {
 	assert(isObjectNodeSchema(schema), 0x924 /* Expected an Object schema. */);
 	if (
 		typeof data !== "object" ||
@@ -403,53 +375,56 @@ function objectToMapTree(data: FactoryContent, schema: TreeNodeSchema): Exclusiv
 		throw new UsageError(`Input data is incompatible with Object schema: ${data}`);
 	}
 
-	const fields = new Map<FieldKey, ExclusiveMapTree[]>();
+	const fields = new Map<FieldKey, UnhydratedFlexTreeField>();
+	const context = getUnhydratedContext(schema).flexContext;
 
-	// Loop through field keys without data.
-	// This does NOT apply defaults.
 	for (const [key, fieldInfo] of schema.flexKeyMap) {
-		if (checkFieldProperty(data, key)) {
-			const value = (data as Record<string, InsertableContent>)[key as string];
-			setFieldValue(fields, value, fieldInfo.schema, fieldInfo.storedKey);
+		const value = getFieldProperty(data, key);
+
+		let children: UnhydratedFlexTreeNode[] | ContextualFieldProvider;
+		if (value === undefined) {
+			const defaultProvider =
+				fieldInfo.schema.props?.defaultProvider ??
+				fail("missing field has no default provider");
+			const fieldProvider = extractFieldProvider(defaultProvider);
+			children = isConstant(fieldProvider) ? fieldProvider() : fieldProvider;
+		} else {
+			children = [nodeDataToMapTree(value, fieldInfo.schema.allowedTypeSet)];
 		}
+
+		const kind = convertFieldKind.get(fieldInfo.schema.kind) ?? fail("Invalid field kind");
+		fields.set(
+			fieldInfo.storedKey,
+			createField(context, kind.identifier, fieldInfo.storedKey, children),
+		);
 	}
 
-	return {
-		type: brand(schema.identifier),
-		fields,
-	};
+	return [{ type: brand(schema.identifier) }, fields];
 }
 
 /**
  * Check {@link FactoryContentObject} for a property which could be store a field.
+ *
+ * @returns If the property exists, return its value. Otherwise, returns undefined.
  * @remarks
  * The currently policy is to only consider own properties.
  * See {@link InsertableObjectFromSchemaRecord} for where this policy is documented in the public API.
  *
- * Explicit undefined members are considered to exist, as long as they are own properties.
+ * Explicit undefined values are treated the same as missing properties to allow explicit use of undefined with defaulted identifiers.
+ *
+ * @privateRemarks
+ * If we ever want to have an optional field which defaults to something other than undefined, this will need changes.
+ * It would need to adjusting the handling of explicit undefined in contexts where undefined is allowed, and a default provider also exists.
  */
-function checkFieldProperty(
+function getFieldProperty(
 	data: FactoryContentObject,
 	key: string | symbol,
-): data is {
-	readonly [P in string]: InsertableContent | undefined;
-} {
+): InsertableContent | undefined {
 	// This policy only allows own properties.
-	return Object.hasOwnProperty.call(data, key);
-}
-
-function setFieldValue(
-	fields: Map<FieldKey, readonly MapTree[]>,
-	fieldValue: InsertableContent | undefined,
-	fieldSchema: FieldSchema,
-	flexKey: FieldKey,
-): void {
-	if (fieldValue !== undefined) {
-		const mappedChildTree = nodeDataToMapTree(fieldValue, fieldSchema.allowedTypeSet);
-
-		assert(!fields.has(flexKey), 0x956 /* Keys must not be duplicated */);
-		fields.set(flexKey, [mappedChildTree]);
+	if (Object.hasOwnProperty.call(data, key)) {
+		return (data as Record<string, InsertableContent>)[key as string];
 	}
+	return undefined;
 }
 
 function getType(
@@ -464,10 +439,6 @@ function getType(
 			)}.`,
 		);
 	}
-	assert(
-		hasSome(possibleTypes),
-		0x84e /* data is incompatible with all types allowed by the schema */,
-	);
 	if (!hasSingle(possibleTypes)) {
 		throw new UsageError(
 			`The provided data is compatible with more than one type allowed by the schema.
@@ -482,7 +453,7 @@ For class-based schema, this can be done by replacing an expression like "{foo: 
 }
 
 /**
- * @returns all types for which the data is schema-compatible.
+ * Returns all types for which the data is schema-compatible.
  */
 export function getPossibleTypes(
 	allowedTypes: ReadonlySet<TreeNodeSchema>,
@@ -606,11 +577,7 @@ function shallowCompatibilityTest(
 	// If the schema has a required key which is not present in the input object, reject it.
 	for (const [fieldKey, fieldSchema] of schema.fields) {
 		if (fieldSchema.requiresValue) {
-			if (checkFieldProperty(data, fieldKey)) {
-				if (data[fieldKey] === undefined) {
-					return CompatibilityLevel.None;
-				}
-			} else {
+			if (getFieldProperty(data, fieldKey) === undefined) {
 				return CompatibilityLevel.None;
 			}
 		}
@@ -624,102 +591,6 @@ function allowsValue(schema: TreeNodeSchema, value: TreeValue): boolean {
 		return valueSchemaAllows(schema.info as ValueSchema, value);
 	}
 	return false;
-}
-
-/**
- * Walk the given {@link ExclusiveMapTree} and deeply provide any field defaults for fields that are missing in the tree but present in the schema.
- * @param mapTree - The tree to populate with defaults. This is borrowed: no references to it are kept by this function.
- * @param allowedTypes - Some {@link TreeNodeSchema}, at least one of which the input tree must conform to
- * @param context - An optional context for generating defaults.
- * If present, all applicable defaults will be provided.
- * If absent, only defaults produced by a {@link ConstantFieldProvider} will be provided, and defaults produced by a {@link ContextualFieldProvider} will be ignored.
- * @remarks This function mutates the input tree by deeply adding new fields to the field maps where applicable.
- */
-export function addDefaultsToMapTree(
-	mapTree: ExclusiveMapTree,
-	allowedTypes: ImplicitAllowedTypes,
-	context: NodeKeyManager | undefined,
-): void {
-	const schema =
-		find(normalizeAllowedTypes(allowedTypes), (s) => s.identifier === mapTree.type) ??
-		fail("MapTree is incompatible with schema");
-
-	if (isObjectNodeSchema(schema)) {
-		for (const [_key, fieldInfo] of schema.flexKeyMap) {
-			const field = mapTree.fields.get(fieldInfo.storedKey);
-			if (field !== undefined) {
-				for (const child of field) {
-					addDefaultsToMapTree(child, fieldInfo.schema.allowedTypes, context);
-				}
-			} else {
-				const defaultProvider = fieldInfo.schema.props?.defaultProvider;
-				if (defaultProvider !== undefined) {
-					const fieldProvider = extractFieldProvider(defaultProvider);
-					const data = provideDefault(fieldProvider, context);
-					if (data !== undefined) {
-						setFieldValue(mapTree.fields, data, fieldInfo.schema, fieldInfo.storedKey);
-						// call addDefaultsToMapTree on newly inserted default values
-						for (const child of mapTree.fields.get(fieldInfo.storedKey) ??
-							fail("Expected field to be populated")) {
-							addDefaultsToMapTree(child, fieldInfo.schema.allowedTypes, context);
-						}
-					}
-				}
-			}
-		}
-		return;
-	}
-
-	switch (schema.kind) {
-		case NodeKind.Array:
-		case NodeKind.Map:
-			{
-				for (const field of mapTree.fields.values()) {
-					for (const child of field) {
-						addDefaultsToMapTree(child, schema.info as ImplicitAllowedTypes, context);
-					}
-				}
-			}
-			break;
-		default:
-			assert(schema.kind === NodeKind.Leaf, 0x989 /* Unrecognized schema kind */);
-			break;
-	}
-}
-
-/**
- * Provides the default value (which can be undefined, for example with optional fields), or undefined if a context is required but not provided.
- * @privateRemarks
- * It is a bit concerning that there is no way for the caller to know when undefined is returned if that is the default value, or a context was required.
- * TODO: maybe better formalize the two stage defaulting (without then with context), or rework this design we only do one stage.
- */
-function provideDefault(
-	fieldProvider: FieldProvider,
-	context: NodeKeyManager | undefined,
-): InsertableContent | undefined {
-	if (context !== undefined) {
-		return fieldProvider(context);
-	} else {
-		if (isConstant(fieldProvider)) {
-			return fieldProvider();
-		} else {
-			// Leaving field empty despite it needing a default value since a context was required and none was provided.
-			// Caller better handle this case by providing the default at some other point in time when the context becomes known.
-		}
-	}
-}
-
-/**
- * Retrieves the InnerNode associated with the given target via {@link setInnerNode}, if any.
- * @remarks
- * If `target` is a unhydrated node, returns its MapTreeNode.
- * If `target` is a cooked node (or marinated but a FlexTreeNode exists) returns the FlexTreeNode.
- * If the target is not a node, or a marinated node with no FlexTreeNode for its anchor, returns undefined.
- */
-function tryGetInnerNode(target: unknown): InnerNode | undefined {
-	if (isTreeNode(target)) {
-		return getKernel(target).tryGetInnerNode();
-	}
 }
 
 /**

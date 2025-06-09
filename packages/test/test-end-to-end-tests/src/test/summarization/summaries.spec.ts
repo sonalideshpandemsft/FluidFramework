@@ -35,6 +35,7 @@ import {
 	ITestObjectProvider,
 	createSummarizer,
 	createSummarizerFromFactory,
+	createTestConfigProvider,
 	getContainerEntryPointBackCompat,
 	summarizeNow,
 	timeoutPromise,
@@ -293,12 +294,10 @@ describeCompat("Summaries", "NoCompat", (getTestObjectProvider, apis) => {
 	});
 
 	it("full initialization of data object should not happen by default", async () => {
-		const dataStoreFactory1 = new DataObjectFactory(
-			"@fluid-example/test-dataStore1",
-			TestDataObject1,
-			[],
-			[],
-		);
+		const dataStoreFactory1 = new DataObjectFactory({
+			type: "@fluid-example/test-dataStore1",
+			ctor: TestDataObject1,
+		});
 		const registryStoreEntries = new Map<string, Promise<IFluidDataStoreFactory>>([
 			[dataStoreFactory1.type, Promise.resolve(dataStoreFactory1)],
 		]);
@@ -479,7 +478,7 @@ describeCompat("Summaries", "NoCompat", (getTestObjectProvider, apis) => {
 		await flushPromises();
 		assert.strictEqual(sharedString1.getLength(), 203);
 		assert.strictEqual(sharedString2.getLength(), 203);
-	});
+	}).timeout(5000);
 
 	itExpects(
 		"attempt last summary if parent container disconnects",
@@ -594,7 +593,10 @@ describeCompat("SingleCommit Summaries Tests", "NoCompat", (getTestObjectProvide
 	let mainContainer: IContainer;
 	const configForSingleCommitSummary: ITestContainerConfig = {
 		loaderProps: {
-			options: { summarizeProtocolTree: true },
+			options: {},
+			configProvider: createTestConfigProvider({
+				"Fluid.Container.summarizeProtocolTree2": true,
+			}),
 		},
 	};
 	const testCache = new TestPersistedCache();

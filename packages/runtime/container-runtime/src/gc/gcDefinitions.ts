@@ -27,8 +27,7 @@ import {
 } from "../summary/index.js";
 
 /**
- * @legacy
- * @alpha
+ * @internal
  */
 export type GCVersion = number;
 
@@ -89,8 +88,7 @@ export const defaultSweepGracePeriodMs = 1 * oneDayMs; // 1 day
 
 /**
  * @see IGCMetadata.gcFeatureMatrix and @see gcGenerationOptionName
- * @legacy
- * @alpha
+ * @internal
  */
 export type GCFeatureMatrix =
 	| {
@@ -129,8 +127,7 @@ export interface IGCMetadata_Deprecated {
 /**
  * GC-specific metadata to be written into the summary.
  *
- * @legacy
- * @alpha
+ * @internal
  */
 export interface IGCMetadata {
 	/**
@@ -179,8 +176,7 @@ export interface IGCMetadata {
 
 /**
  * The statistics of the system state after a garbage collection mark phase run.
- * @legacy
- * @alpha
+ * @internal
  */
 export interface IMarkPhaseStats {
 	/**
@@ -223,8 +219,7 @@ export interface IMarkPhaseStats {
 
 /**
  * The statistics of the system state after a garbage collection sweep phase run.
- * @legacy
- * @alpha
+ * @internal
  */
 export interface ISweepPhaseStats {
 	/**
@@ -255,15 +250,13 @@ export interface ISweepPhaseStats {
 
 /**
  * The statistics of the system state after a garbage collection run.
- * @legacy
- * @alpha
+ * @internal
  */
 export interface IGCStats extends IMarkPhaseStats, ISweepPhaseStats {}
 
 /**
  * The types of GC nodes in the GC reference graph.
- * @legacy
- * @alpha
+ * @internal
  */
 export const GCNodeType = {
 	// Nodes that are for data stores.
@@ -277,8 +270,7 @@ export const GCNodeType = {
 } as const;
 
 /**
- * @legacy
- * @alpha
+ * @internal
  */
 export type GCNodeType = (typeof GCNodeType)[keyof typeof GCNodeType];
 
@@ -341,6 +333,8 @@ export type GarbageCollectionMessage = ISweepMessage | ITombstoneLoadedMessage;
 
 /**
  * Defines the APIs for the runtime object to be passed to the garbage collector.
+ *
+ * @internal
  */
 export interface IGarbageCollectionRuntime {
 	/**
@@ -454,7 +448,7 @@ export interface IGarbageCollector {
 	 * Returns true if this node has been deleted by GC during sweep phase.
 	 */
 	isNodeDeleted(nodePath: string): boolean;
-	setConnectionState(connected: boolean, clientId?: string): void;
+	setConnectionState(canSendOps: boolean, clientId?: string): void;
 	dispose(): void;
 }
 
@@ -502,7 +496,9 @@ export interface IGarbageCollectorCreateParams {
 	readonly gcOptions: IGCRuntimeOptions;
 	readonly baseLogger: ITelemetryLoggerExt;
 	readonly existing: boolean;
+
 	readonly metadata: IContainerRuntimeMetadata | undefined;
+
 	readonly createContainerMetadata: ICreateContainerMetadata;
 	readonly baseSnapshot: ISnapshotTree | undefined;
 	readonly isSummarizerClient: boolean;

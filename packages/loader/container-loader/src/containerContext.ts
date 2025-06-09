@@ -3,6 +3,10 @@
  * Licensed under the MIT License.
  */
 
+import type {
+	ILayerCompatDetails,
+	IProvideLayerCompatDetails,
+} from "@fluid-internal/client-utils";
 import {
 	AttachState,
 	IAudience,
@@ -30,10 +34,15 @@ import {
 } from "@fluidframework/driver-definitions/internal";
 import { ITelemetryLoggerExt } from "@fluidframework/telemetry-utils/internal";
 
+import { loaderCompatDetailsForRuntime } from "./loaderLayerCompatState.js";
+
 /**
  * {@inheritDoc @fluidframework/container-definitions#IContainerContext}
  */
-export class ContainerContext implements IContainerContext {
+export class ContainerContext implements IContainerContext, IProvideLayerCompatDetails {
+	/**
+	 * @deprecated - This has been replaced by ILayerCompatDetails.
+	 */
 	public readonly supportedFeatures: ReadonlyMap<string, unknown> = new Map([
 		/**
 		 * This version of the loader accepts `referenceSequenceNumber`, provided by the container runtime,
@@ -60,6 +69,14 @@ export class ContainerContext implements IContainerContext {
 	 */
 	public get connected(): boolean {
 		return this._getConnected();
+	}
+
+	/**
+	 * The compatibility details of the Loader layer that is exposed to the Runtime layer
+	 * for validating Runtime-Loader compatibility.
+	 */
+	public get ILayerCompatDetails(): ILayerCompatDetails {
+		return loaderCompatDetailsForRuntime;
 	}
 
 	constructor(

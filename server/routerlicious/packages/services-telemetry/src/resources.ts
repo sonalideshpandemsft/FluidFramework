@@ -4,6 +4,7 @@
  */
 
 import { serializeError } from "serialize-error";
+
 import { Lumber } from "./lumber";
 import { LumberEventName } from "./lumberEventNames";
 
@@ -71,8 +72,9 @@ export enum HttpProperties {
 	status = "status",
 	url = "url",
 	retryCount = "retryCount",
-	tenantId = "tenantId",
-	documentId = "documentId",
+	scheme = "scheme",
+	httpVersion = "httpVersion",
+	hostName = "hostName",
 }
 
 /**
@@ -124,6 +126,7 @@ export enum CommonProperties {
 	errorLabel = "errorLabel",
 	isGlobalDb = "isGlobalDb",
 	internalErrorCode = "internalErrorCode",
+	callingServiceName = "callingServiceName",
 }
 
 /**

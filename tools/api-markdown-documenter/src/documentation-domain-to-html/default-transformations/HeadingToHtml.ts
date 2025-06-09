@@ -31,7 +31,10 @@ const maxHeadingLevel = 6;
  *
  * Observes {@link RenderContext.headingLevel} to determine the heading level to use.
  */
-export function headingToHtml(headingNode: HeadingNode, context: TransformationContext): HastNodes {
+export function headingToHtml(
+	headingNode: HeadingNode,
+	context: TransformationContext,
+): HastNodes {
 	const { headingLevel } = context;
 
 	// HTML only supports heading levels up to 6. If our level is beyond that, we will transform the input to simple
@@ -45,7 +48,7 @@ export function headingToHtml(headingNode: HeadingNode, context: TransformationC
 
 		return transformChildrenUnderTag(
 			{ name: `h${headingLevel}`, attributes },
-			headingNode.children,
+			[headingNode.title],
 			context,
 		);
 	} else {
@@ -54,7 +57,7 @@ export function headingToHtml(headingNode: HeadingNode, context: TransformationC
 			transformedChildren.push(h("a", { id: headingNode.id }));
 		}
 		transformedChildren.push(
-			transformChildrenUnderTag({ name: "b" }, headingNode.children, context),
+			transformChildrenUnderTag({ name: "b" }, [headingNode.title], context),
 		);
 
 		// Wrap the 2 child elements in a fragment

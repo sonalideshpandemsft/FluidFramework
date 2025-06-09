@@ -3,13 +3,8 @@
  * Licensed under the MIT License.
  */
 
-import express from "express";
-import morgan from "morgan";
-// eslint-disable-next-line import/no-unresolved
-import { Params } from "express-serve-static-core";
-import { decode } from "jsonwebtoken";
-import { ITokenClaims } from "@fluidframework/protocol-definitions";
-import { NetworkError } from "@fluidframework/server-services-client";
+import { monitorEventLoopDelay, type IntervalHistogram } from "perf_hooks";
+
 import {
 	BaseTelemetryProperties,
 	CommonProperties,
@@ -17,7 +12,9 @@ import {
 	LumberEventName,
 	Lumberjack,
 } from "@fluidframework/server-services-telemetry";
-import { getParam } from "./auth";
+import express from "express";
+import morgan from "morgan";
+
 import { getTelemetryContextPropertiesWithHttpInfo } from "./telemetryContext";
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
@@ -38,6 +35,9 @@ const stream = split().on("data", (message) => {
 export function alternativeMorganLoggerMiddleware(loggerFormat: string) {
 	return morgan(loggerFormat, { stream });
 }
+
+morgan.token("http-version", (req: express.Request, res: express.Response) => req.httpVersion);
+morgan.token("scheme", (req: express.Request, res: express.Response) => req.protocol);
 
 /**
  * @internal
@@ -62,56 +62,12 @@ interface IResponseLatency {
 	closeTime: number;
 }
 
-export function parseToken(
-	tenantId: string,
-	authorization: string | undefined,
-): string | undefined {
-	let token: string | undefined;
-	if (authorization) {
-		const base64TokenMatch = authorization.match(/Basic (.+)/);
-		if (!base64TokenMatch) {
-			throw new NetworkError(403, "Malformed authorization token");
-		}
-		const encoded = Buffer.from(base64TokenMatch[1], "base64").toString();
-
-		const tokenMatch = encoded.match(/(.+):(.+)/);
-		if (!tokenMatch || tenantId !== tokenMatch[1]) {
-			throw new NetworkError(403, "Malformed authorization token");
-		}
-
-		token = tokenMatch[2];
-	}
-
-	return token;
-}
-
-export function getTenantIdFromRequest(params: Params) {
-	const tenantId = getParam(params, "tenantId");
-	if (tenantId !== undefined) {
-		return tenantId;
-	}
-	const id = getParam(params, "id");
-	if (id !== undefined) {
-		return id;
-	}
-
-	return "-";
-}
-
-function getDocumentIdFromRequest(tenantId: string, authorization: string | undefined) {
-	if (!authorization) {
-		return "-";
-	}
-	try {
-		const token = parseToken(tenantId, authorization);
-		if (token === undefined) {
-			throw new NetworkError(400, "Token undefined");
-		}
-		const decoded = decode(token) as unknown as ITokenClaims;
-		return decoded.documentId;
-	} catch (err) {
-		return "-";
-	}
+function getEventLoopMetrics(histogram: IntervalHistogram) {
+	return {
+		max: (histogram.max / 1e6).toFixed(3),
+		min: (histogram.min / 1e6).toFixed(3),
+		mean: (histogram.mean / 1e6).toFixed(3),
+	};
 }
 
 /**
@@ -125,6 +81,7 @@ export function jsonMorganLoggerMiddleware(
 		res: express.Response,
 	) => Record<string, any>,
 	enableLatencyMetric: boolean = false,
+	enableEventLoopLagMetric: boolean = false, // This metric has performance overhead, so it should be enabled with caution.
 ): express.RequestHandler {
 	return (request, response, next): void => {
 		response.locals.clientDisconnected = false;
@@ -177,19 +134,31 @@ export function jsonMorganLoggerMiddleware(
 					});
 			  })
 			: undefined;
+		// HTTP Metric durationInMs should only track internal server time, so manually set it before waiting for response close.
 		const startTime = performance.now();
+		let histogram: IntervalHistogram;
+		if (enableEventLoopLagMetric) {
+			histogram = monitorEventLoopDelay();
+			histogram.enable();
+		}
 		const httpMetric = Lumberjack.newLumberMetric(LumberEventName.HttpRequest);
 		morgan<express.Request, express.Response>((tokens, req, res) => {
 			let additionalProperties = {};
 			if (computeAdditionalProperties) {
 				additionalProperties = computeAdditionalProperties(tokens, req, res);
 			}
+			const durationInMs = performance.now() - startTime;
 			let statusCode = tokens.status(req, res);
 			if (!statusCode) {
+				// The effort of trying to distinguish client close vs server close can be tricky when it reaches proxy timeout.
+				// If proxy timeout happen a little before server timeout, it is actually more due to a server timeout issue.
+				// Therefore, we can assume it is server timeout (triggered by client) if duration is longer than 20s without
+				// a valid status code
 				if (res.locals.serverTimeout) {
 					statusCode = "Server Timeout";
 				} else if (res.locals.clientDisconnected) {
-					statusCode = "499";
+					statusCode =
+						durationInMs > 20_000 ? "Server Timeout - Client Disconnect" : "499";
 				} else {
 					statusCode = "STATUS_UNAVAILABLE";
 				}
@@ -206,6 +175,9 @@ export function jsonMorganLoggerMiddleware(
 				[HttpProperties.requestContentLength]: tokens.req(req, res, "content-length"),
 				[HttpProperties.responseContentLength]: tokens.res(req, res, "content-length"),
 				[HttpProperties.responseTime]: tokens["response-time"](req, res),
+				[HttpProperties.httpVersion]: tokens["http-version"](req, res),
+				[HttpProperties.scheme]: tokens.scheme(req, res),
+				[HttpProperties.hostName]: req.hostname ?? "HOSTNAME_UNAVAILABLE",
 				[BaseTelemetryProperties.correlationId]: getTelemetryContextPropertiesWithHttpInfo(
 					req,
 					res,
@@ -226,6 +198,10 @@ export function jsonMorganLoggerMiddleware(
 			};
 			httpMetric.setProperties(properties);
 			const resolveMetric = () => {
+				if (enableEventLoopLagMetric) {
+					histogram.disable();
+					httpMetric.setProperty("eventLoopLagMs", getEventLoopMetrics(histogram));
+				}
 				if (properties.status?.startsWith("2")) {
 					httpMetric.success("Request successful");
 				} else {
@@ -236,9 +212,7 @@ export function jsonMorganLoggerMiddleware(
 				// Morgan middleware logs using the [on-finished](https://www.npmjs.com/package/on-finished) package, meaning that it will log
 				// request duration immediately on response 'finish' event. However, the gap between 'finish' and 'close' can be helpful for
 				// understanding response latency.
-				const endTime = performance.now();
-				// HTTP Metric durationInMs should only track internal server time, so manually set it before waiting for response close.
-				httpMetric.setProperty("durationInMs", endTime - startTime);
+				httpMetric.setProperty("durationInMs", durationInMs);
 				// Wait for response 'close' event to signal that the response is completed.
 				responseLatencyP
 					?.then((responseLatency) => {

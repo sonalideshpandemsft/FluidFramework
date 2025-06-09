@@ -5,19 +5,24 @@
 
 /* eslint-disable unicorn/consistent-function-scoping */
 
-import { TypedEventEmitter, performance } from "@fluid-internal/client-utils";
+import {
+	TypedEventEmitter,
+	performanceNow,
+	type ILayerCompatDetails,
+} from "@fluid-internal/client-utils";
 import {
 	AttachState,
 	IAudience,
 	ICriticalContainerError,
 } from "@fluidframework/container-definitions";
-import {
+import type {
 	ContainerWarning,
 	IBatchMessage,
 	ICodeDetailsLoader,
 	IContainer,
 	IContainerEvents,
 	IContainerLoadMode,
+	IDeltaManager,
 	IFluidCodeDetails,
 	IFluidCodeDetailsComparer,
 	IFluidModuleWithDetails,
@@ -25,11 +30,11 @@ import {
 	IProvideFluidCodeDetailsComparer,
 	IProvideRuntimeFactory,
 	IRuntime,
-	isFluidCodeDetails,
-	IDeltaManager,
 	ReadOnlyInfo,
-	type ILoader,
+	ILoader,
+	ILoaderOptions,
 } from "@fluidframework/container-definitions/internal";
+import { isFluidCodeDetails } from "@fluidframework/container-definitions/internal";
 import {
 	FluidObject,
 	IEvent,
@@ -67,7 +72,6 @@ import {
 	ISequencedDocumentMessage,
 	ISignalMessage,
 	type ConnectionMode,
-	type IContainerPackageInfo,
 } from "@fluidframework/driver-definitions/internal";
 import {
 	getSnapshotTree,
@@ -123,12 +127,12 @@ import {
 	getPackageName,
 } from "./contracts.js";
 import { DeltaManager, IConnectionArgs } from "./deltaManager.js";
-// eslint-disable-next-line import/no-deprecated
-import { IDetachedBlobStorage, ILoaderOptions, RelativeLoader } from "./loader.js";
+import { RelativeLoader } from "./loader.js";
+import { validateRuntimeCompatibility } from "./loaderLayerCompatState.js";
 import {
-	serializeMemoryDetachedBlobStorage,
 	createMemoryDetachedBlobStorage,
 	tryInitializeMemoryDetachedBlobStorage,
+	type MemoryDetachedBlobStorage,
 } from "./memoryBlobStorage.js";
 import { NoopHeuristic } from "./noopHeuristic.js";
 import { pkgVersion } from "./packageVersion.js";
@@ -221,7 +225,6 @@ export interface IContainerCreateProps {
 	 * A property bag of options used by various layers
 	 * to control features
 	 */
-	// eslint-disable-next-line import/no-deprecated
 	readonly options: ILoaderOptions;
 
 	/**
@@ -234,12 +237,6 @@ export interface IContainerCreateProps {
 	 * The logger downstream consumers should construct their loggers from
 	 */
 	readonly subLogger: ITelemetryLoggerExt;
-
-	/**
-	 * Blobs storage for detached containers.
-	 */
-	// eslint-disable-next-line import/no-deprecated
-	readonly detachedBlobStorage?: IDetachedBlobStorage;
 
 	/**
 	 * Optional property for allowing the container to use a custom
@@ -483,12 +480,10 @@ export class Container
 	private readonly urlResolver: IUrlResolver;
 	private readonly serviceFactory: IDocumentServiceFactory;
 	private readonly codeLoader: ICodeDetailsLoader;
-	// eslint-disable-next-line import/no-deprecated
 	private readonly options: ILoaderOptions;
 	private readonly scope: FluidObject;
 	private readonly subLogger: ITelemetryLoggerExt;
-	// eslint-disable-next-line import/no-deprecated
-	private readonly detachedBlobStorage: IDetachedBlobStorage | undefined;
+	private readonly detachedBlobStorage: MemoryDetachedBlobStorage | undefined;
 	private readonly protocolHandlerBuilder: ProtocolHandlerBuilder;
 	private readonly client: IClient;
 
@@ -617,7 +612,7 @@ export class Container
 	private readonly clientsWhoShouldHaveLeft = new Set<string>();
 	private _containerMetadata: Readonly<Record<string, string>> = {};
 
-	private setAutoReconnectTime = performance.now();
+	private setAutoReconnectTime = performanceNow();
 
 	private noopHeuristic: NoopHeuristic | undefined;
 
@@ -719,14 +714,6 @@ export class Container
 		return this._loadedCodeDetails;
 	}
 
-	/**
-	 * Get the package info for the code details that were used to load the container.
-	 * @returns The package info for the code details that were used to load the container if it is loaded, undefined otherwise
-	 */
-	public getContainerPackageInfo?(): IContainerPackageInfo | undefined {
-		return getPackageName(this._loadedCodeDetails);
-	}
-
 	private _loadedModule: IFluidModuleWithDetails | undefined;
 
 	/**
@@ -799,11 +786,10 @@ export class Container
 			options,
 			scope,
 			subLogger,
-			detachedBlobStorage,
 			protocolHandlerBuilder,
 		} = createProps;
 
-		this.connectionTransitionTimes[ConnectionState.Disconnected] = performance.now();
+		this.connectionTransitionTimes[ConnectionState.Disconnected] = performanceNow();
 		const pendingLocalState = loadProps?.pendingLocalState;
 
 		this._canReconnect = canReconnect ?? true;
@@ -891,7 +877,7 @@ export class Container
 							: this.deltaManager?.lastMessage?.clientId,
 					dmLastMsgClientSeq: () => this.deltaManager?.lastMessage?.clientSequenceNumber,
 					connectionStateDuration: () =>
-						performance.now() - this.connectionTransitionTimes[this.connectionState],
+						performanceNow() - this.connectionTransitionTimes[this.connectionState],
 				},
 			},
 		});
@@ -935,7 +921,7 @@ export class Container
 						mode,
 						category: this._lifecycleState === "loading" ? "generic" : category,
 						duration:
-							performance.now() - this.connectionTransitionTimes[ConnectionState.CatchingUp],
+							performanceNow() - this.connectionTransitionTimes[ConnectionState.CatchingUp],
 						...(details === undefined ? {} : { details: JSON.stringify(details) }),
 					});
 
@@ -989,16 +975,16 @@ export class Container
 				? summaryTree
 				: combineAppAndProtocolSummary(summaryTree, this.captureProtocolSummary());
 
-		// Whether the combined summary tree has been forced on by either the supportedFeatures flag by the service or the the loader option or the monitoring context
-		const enableSummarizeProtocolTree =
-			this.mc.config.getBoolean("Fluid.Container.summarizeProtocolTree2") ??
-			options.summarizeProtocolTree;
+		// Feature gate to enable single-commit summaries. The expected enablement is through driver layer's policies,
+		// but here we also specify config setting to use for testing purposes.
+		const enableSummarizeProtocolTree = this.mc.config.getBoolean(
+			"Fluid.Container.summarizeProtocolTree2",
+		);
 
 		this.detachedBlobStorage =
-			detachedBlobStorage ??
-			(this.mc.config.getBoolean("Fluid.Container.MemoryBlobStorageEnabled") === true
-				? createMemoryDetachedBlobStorage()
-				: undefined);
+			this.attachState === AttachState.Attached
+				? undefined
+				: createMemoryDetachedBlobStorage();
 
 		this.storageAdapter = new ContainerStorageAdapter(
 			this.detachedBlobStorage,
@@ -1031,10 +1017,10 @@ export class Container
 			document.addEventListener !== null;
 		// keep track of last time page was visible for telemetry (on interactive clients only)
 		if (isDomAvailable && interactive) {
-			this.lastVisible = document.hidden ? performance.now() : undefined;
+			this.lastVisible = document.hidden ? performanceNow() : undefined;
 			this.visibilityEventHandler = (): void => {
 				if (document.hidden) {
-					this.lastVisible = performance.now();
+					this.lastVisible = performanceNow();
 				} else {
 					// settimeout so this will hopefully fire after disconnect event if being hidden caused it
 					setTimeout(() => {
@@ -1273,7 +1259,7 @@ export class Container
 			pendingRuntimeState,
 			hasAttachmentBlobs:
 				this.detachedBlobStorage !== undefined && this.detachedBlobStorage.size > 0,
-			attachmentBlobs: serializeMemoryDetachedBlobStorage(this.detachedBlobStorage),
+			attachmentBlobs: this.detachedBlobStorage?.serialize(),
 		};
 		return JSON.stringify(detachedContainerState);
 	}
@@ -1411,7 +1397,7 @@ export class Container
 			return;
 		}
 
-		const now = performance.now();
+		const now = performanceNow();
 		const duration = now - this.setAutoReconnectTime;
 		this.setAutoReconnectTime = now;
 
@@ -1629,7 +1615,7 @@ export class Container
 		dmLastProcessedSeqNumber: number;
 		dmLastKnownSeqNumber: number;
 	}> {
-		const timings: Record<string, number> = { phase1: performance.now() };
+		const timings: Record<string, number> = { phase1: performanceNow() };
 		this.service = await this.createDocumentService(async () =>
 			this.serviceFactory.createDocumentService(
 				resolvedUrl,
@@ -1662,7 +1648,7 @@ export class Container
 			state: AttachState.Attached,
 		};
 
-		timings.phase2 = performance.now();
+		timings.phase2 = performanceNow();
 
 		// Fetch specified snapshot.
 		const { baseSnapshot, version } =
@@ -1722,7 +1708,7 @@ export class Container
 			this.protocolHandler.audience.setCurrentClientId(pendingLocalState?.clientId);
 		}
 
-		timings.phase3 = performance.now();
+		timings.phase3 = performanceNow();
 		const codeDetails = this.getCodeDetailsFromQuorum();
 		await this.instantiateRuntime(
 			codeDetails,
@@ -1785,7 +1771,7 @@ export class Container
 			throw new Error("Container was closed while load()");
 		}
 
-		timings.end = performance.now();
+		timings.end = performanceNow();
 		this.subLogger.sendTelemetryEvent(
 			{
 				eventName: "LoadStagesTimings",
@@ -1835,6 +1821,10 @@ export class Container
 	}: IPendingDetachedContainerState): Promise<void> {
 		if (hasAttachmentBlobs) {
 			if (attachmentBlobs !== undefined) {
+				assert(
+					this.detachedBlobStorage !== undefined,
+					0xb8e /* detached blob storage should always exist when detached */,
+				);
 				tryInitializeMemoryDetachedBlobStorage(this.detachedBlobStorage, attachmentBlobs);
 			}
 			assert(
@@ -2152,7 +2142,7 @@ export class Container
 		reason?: IConnectionStateChangeReason,
 	): void {
 		// Log actual event
-		const time = performance.now();
+		const time = performanceNow();
 		this.connectionTransitionTimes[value] = time;
 		const duration = time - this.connectionTransitionTimes[oldState];
 
@@ -2191,7 +2181,7 @@ export class Container
 				opsBehind,
 				online: OnlineStatus[isOnline()],
 				lastVisible:
-					this.lastVisible === undefined ? undefined : performance.now() - this.lastVisible,
+					this.lastVisible === undefined ? undefined : performanceNow() - this.lastVisible,
 				checkpointSequenceNumber,
 				quorumSize: this._protocolHandler?.quorum.getMembers().size,
 				audienceSize: this._protocolHandler?.audience.getMembers().size,
@@ -2461,11 +2451,20 @@ export class Container
 			snapshot,
 		);
 
-		this._runtime = await PerformanceEvent.timedExecAsync(
+		const runtime = await PerformanceEvent.timedExecAsync(
 			this.subLogger,
 			{ eventName: "InstantiateRuntime" },
 			async () => runtimeFactory.instantiateRuntime(context, existing),
 		);
+
+		// Validate that the Runtime is compatible with this Loader.
+		const maybeRuntimeCompatDetails = runtime as FluidObject<ILayerCompatDetails>;
+		validateRuntimeCompatibility(maybeRuntimeCompatDetails.ILayerCompatDetails, (error) =>
+			this.dispose(error),
+		);
+
+		this._runtime = runtime;
+
 		this._lifecycleEvents.emit("runtimeInstantiated");
 
 		this._loadedCodeDetails = codeDetails;
@@ -2487,13 +2486,11 @@ export class Container
 	 */
 	private setContextConnectedState(connected: boolean, readonly: boolean): void {
 		if (this._runtime?.disposed === false && this.loaded) {
-			/**
-			 * We want to lie to the ContainerRuntime when we are in readonly mode to prevent issues with pending
-			 * ops getting through to the DeltaManager.
-			 * The ContainerRuntime's "connected" state simply means it is ok to send ops
-			 * See https://dev.azure.com/fluidframework/internal/_workitems/edit/1246
-			 */
-			this.runtime.setConnectionState(connected && !readonly, this.clientId);
+			this.runtime.setConnectionState(
+				connected &&
+					!readonly /* container can send ops if connected to service and not in readonly mode */,
+				this.clientId,
+			);
 		}
 	}
 

@@ -75,6 +75,14 @@ export interface ICollaborationSession {
 	 */
 	firstClientJoinTime: number;
 	/**
+	 * Time when the most recent client joined the session.
+	 *
+	 * @remarks
+	 * Use this value to determine if/when a session should expire.
+	 * Possibly undefined for backwards compatibility.
+	 */
+	latestClientJoinTime: number | undefined;
+	/**
 	 * Time when the last client left the session.
 	 * Undefined if the session is still active and the last client has not left
 	 * or a new client re-joined the session before it expired.
@@ -150,7 +158,7 @@ export interface ICollaborationSessionTracker {
 		client: ICollaborationSessionClient,
 		sessionId: Pick<ICollaborationSession, "tenantId" | "documentId">,
 		knownConnectedClients?: ISignalClient[],
-	): void;
+	): Promise<void>;
 	/**
 	 * End tracking a client session for a document.
 	 *
@@ -165,10 +173,10 @@ export interface ICollaborationSessionTracker {
 	 * @param otherConnectedClients - Optional list of other clients currently connected to the document session.
 	 */
 	endClientSession(
-		client: ICollaborationSessionClient,
+		client: Omit<ICollaborationSessionClient, "joinedTime">,
 		sessionId: Pick<ICollaborationSession, "tenantId" | "documentId">,
 		knownConnectedClients?: ISignalClient[],
-	): void;
+	): Promise<void>;
 	/**
 	 * Remove all currently tracked sessions that are no longer active and should have expired based on the session timeout.
 	 *
@@ -176,5 +184,5 @@ export interface ICollaborationSessionTracker {
 	 * This should be called periodically to ensure that sessions are not kept active indefinitely due to the service with the original
 	 * timer shutting down or other errors related to session clean up.
 	 */
-	pruneInactiveSessions(): void;
+	pruneInactiveSessions(): Promise<void>;
 }

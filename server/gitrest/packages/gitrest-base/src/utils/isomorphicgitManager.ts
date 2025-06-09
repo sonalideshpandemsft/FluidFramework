@@ -7,7 +7,9 @@ import type * as resources from "@fluidframework/gitresources";
 import { NetworkError } from "@fluidframework/server-services-client";
 import { Lumberjack } from "@fluidframework/server-services-telemetry";
 import * as isomorphicGit from "isomorphic-git";
+
 import { IExternalStorageManager } from "../externalStorageManager";
+
 import {
 	IExternalWriterConfig,
 	IFileSystemManager,
@@ -352,6 +354,7 @@ export class IsomorphicGitRepositoryManager extends RepositoryManagerBase {
 				ref: refId,
 			});
 		} catch (e: any) {
+			Lumberjack.error("Failed to delete ref", this.lumberjackBaseProperties, e);
 			throw new NetworkError(500, `Failed to delete ref. Error: ${e}`);
 		}
 	}

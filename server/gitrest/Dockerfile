@@ -2,7 +2,10 @@
 # Licensed under the MIT License.
 # DisableDockerDetector "No feasible secure solution for OSS repos yet"
 
-FROM node:18.20.5-bookworm-slim@sha256:c4a278056a0f79abf472d912bbf5af6c874126ae450faad9df52069e9ad78335 AS runnerbase
+# Use the manifest digest's sha256 hash to ensure we are always using the same version of the base image.
+# That version of the base image must also be baked into the CI build agent by a repo maintainer.
+# This avoids throttling issues with Docker Hub by using an image baked into the pipeline build image.
+FROM node:20.19.0-bookworm-slim@sha256:990084211ea3d72132f286a038bf27e0f79b8cad532ae623b090f3486490e62e AS runnerbase
 
 ARG SETVERSION_VERSION=dev
 ENV SETVERSION_VERSION=$SETVERSION_VERSION
@@ -32,7 +35,6 @@ WORKDIR $GITREST_ROOT
 COPY package*.json ./
 COPY pnpm*.yaml ./
 COPY .npmrc ./
-COPY lerna.json ./
 COPY scripts/*.* ./scripts/
 COPY .npmrc ./
 
@@ -43,7 +45,12 @@ ENV PNPM_HOME="/pnpm"
 # Add package dependency's executables to the PATH. We also add global pnpm executables by including $PNPM_HOME,
 # though it's not leveraged currently.
 ENV PATH="$PNPM_HOME:$GITREST_ROOT/node_modules/.bin:$PATH"
-RUN corepack enable
+
+# Note: `npm install -g corepack` was added as a temporary workaround in response to https://github.com/nodejs/corepack/issues/612.
+# The NPM registry recently rotated some keys but non-latest corepack versions (like those distributed with Node18)
+# have hardcoded references to the old keys and thus fail to install packages that were signed with the new keys.
+# So install the latest corepack globally to work around the problem.
+RUN npm install -g corepack && corepack enable
 
 # Need to set the --unsafe-perm flag since we are doing the install as root. Consider adding an 'app' account so we
 # can do the install as node but then switch to 'app' to run. As app we won't be able to write to installed files

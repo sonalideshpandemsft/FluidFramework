@@ -4,8 +4,10 @@
  */
 
 import { EventEmitter } from "events";
-import { Provider } from "nconf";
+
 import { safelyParseJSON } from "@fluidframework/common-utils";
+import { Provider } from "nconf";
+
 import { BoxcarType, IBoxcarMessage, IMessage } from "./messages";
 import { IQueuedMessage } from "./queue";
 
@@ -106,6 +108,11 @@ export interface IContext {
 	 * Resumes the context
 	 */
 	resume(): void;
+
+	/**
+	 * Sets the last successfully processed offset.
+	 */
+	setLastSuccessfulOffset?(offset: number): void;
 }
 
 /**

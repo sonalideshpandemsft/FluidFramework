@@ -3,17 +3,14 @@
  * Licensed under the MIT License.
  */
 
-export {
-	wrapDocumentService,
-	wrapDocumentServiceFactory,
-	wrapDocumentStorageService,
-} from "./DriverWrappers.js";
 export { IProvideTestFluidObject, ITestFluidObject } from "./interfaces.js";
 export { LoaderContainerTracker } from "./loaderContainerTracker.js";
 export {
 	fluidEntryPoint,
 	LocalCodeLoader,
 	SupportedExportInterfaces,
+	Factory,
+	createDataStoreFactory,
 } from "./localCodeLoader.js";
 export {
 	createAndAttachContainer,
@@ -31,6 +28,7 @@ export {
 	ChannelFactoryRegistry,
 	TestFluidObject,
 	TestFluidObjectFactory,
+	TestDataObjectKind,
 } from "./testFluidObject.js";
 export {
 	createDocumentId,
@@ -53,7 +51,6 @@ export {
 	SummaryInfo,
 } from "./TestSummaryUtils.js";
 export {
-	defaultTimeoutDurationMs,
 	timeoutAwait,
 	timeoutPromise,
 	type TimeoutDurationOption,
@@ -66,4 +63,10 @@ export {
 	getContainerEntryPointBackCompat,
 	getDataStoreEntryPointBackCompat,
 } from "./containerUtils.js";
-export { createContainerRuntimeFactoryWithDefaultDataStore } from "./testContainerRuntimeFactoryWithDefaultDataStore.js";
+export {
+	type ContainerRuntimeFactoryWithDefaultDataStoreConstructor,
+	type ContainerRuntimeFactoryWithDefaultDataStoreProps,
+	createContainerRuntimeFactoryWithDefaultDataStore,
+} from "./testContainerRuntimeFactoryWithDefaultDataStore.js";
+
+export { TestFluidObjectInternal } from "./testFluidObjectInternal.js";

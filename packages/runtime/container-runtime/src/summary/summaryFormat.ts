@@ -10,10 +10,7 @@ import {
 	ISnapshotTree,
 	ISequencedDocumentMessage,
 } from "@fluidframework/driver-definitions/internal";
-import {
-	blobHeadersBlobName as blobNameForBlobHeaders,
-	readAndParse,
-} from "@fluidframework/driver-utils/internal";
+import { readAndParse } from "@fluidframework/driver-utils/internal";
 import {
 	ISummaryTreeWithStats,
 	channelsTreeName,
@@ -128,9 +125,9 @@ export function hasIsolatedChannels(attributes: ReadFluidDataStoreAttributes): b
 }
 
 /**
- * @legacy
- * @alpha
+ * @internal
  */
+
 export interface IContainerRuntimeMetadata extends ICreateContainerMetadata, IGCMetadata {
 	readonly summaryFormatVersion: 1;
 	/**
@@ -158,8 +155,7 @@ export interface IContainerRuntimeMetadata extends ICreateContainerMetadata, IGC
 }
 
 /**
- * @legacy
- * @alpha
+ * @internal
  */
 export interface ICreateContainerMetadata {
 	/**
@@ -174,8 +170,7 @@ export interface ICreateContainerMetadata {
 
 /**
  * The properties of an ISequencedDocumentMessage to be stored in the metadata blob in summary.
- * @legacy
- * @alpha
+ * @internal
  */
 export type ISummaryMetadataMessage = Pick<
 	ISequencedDocumentMessage,
@@ -227,7 +222,6 @@ export const chunksBlobName = ".chunks";
 export const recentBatchInfoBlobName = ".recentBatchInfo";
 export const electedSummarizerBlobName = ".electedSummarizer";
 export const idCompressorBlobName = ".idCompressor";
-export const blobHeadersBlobName = blobNameForBlobHeaders;
 
 export function rootHasIsolatedChannels(metadata?: IContainerRuntimeMetadata): boolean {
 	return !!metadata && !metadata.disableIsolatedChannels;
@@ -308,3 +302,5 @@ export async function getFluidDataStoreAttributes(
 	assert(formatVersion > 0, 0x1d5 /* Invalid snapshot format version */);
 	return attributes;
 }
+
+export { blobHeadersBlobName } from "@fluidframework/driver-utils/internal";

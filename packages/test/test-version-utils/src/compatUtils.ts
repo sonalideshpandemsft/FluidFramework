@@ -9,6 +9,7 @@ import { FluidTestDriverConfig, createFluidTestDriver } from "@fluid-private/tes
 import {
 	DefaultSummaryConfiguration,
 	CompressionAlgorithms,
+	disabledCompressionConfig,
 	ICompressionRuntimeOptions,
 	type IContainerRuntimeOptionsInternal,
 } from "@fluidframework/container-runtime/internal";
@@ -88,10 +89,12 @@ function filterRuntimeOptionsForVersion(
 
 	// These is the "maximum" config.
 	const {
-		compressionOptions = {
-			minimumBatchSizeInBytes: 200,
-			compressionAlgorithm: CompressionAlgorithms.lz4,
-		},
+		compressionOptions = options.enableGroupedBatching === false
+			? disabledCompressionConfig
+			: {
+					minimumBatchSizeInBytes: 200,
+					compressionAlgorithm: CompressionAlgorithms.lz4,
+				},
 		enableGroupedBatching = true,
 		enableRuntimeIdCompressor = "on",
 		// Some t9s tests timeout with small settings. This is likely due to too many ops going through.
@@ -102,7 +105,7 @@ function filterRuntimeOptionsForVersion(
 	if (version.startsWith("1.")) {
 		options = {
 			// None of these features are supported by 1.3
-			compressionOptions: undefined,
+			compressionOptions: disabledCompressionConfig,
 			enableGroupedBatching: false,
 			enableRuntimeIdCompressor: undefined,
 			// Enable chunking.
@@ -248,6 +251,7 @@ export async function getVersionedTestObjectProviderFromApis(
 				containerOptions?.runtimeOptions,
 				type,
 			),
+			containerOptions?.minVersionForCollab,
 		);
 	};
 
@@ -360,6 +364,7 @@ export async function getCompatVersionedTestObjectProviderFromApis(
 				containerOptions?.runtimeOptions,
 				driverConfig.type,
 			),
+			containerOptions?.minVersionForCollab,
 			[innerRequestHandler],
 		);
 	};
@@ -384,6 +389,7 @@ export async function getCompatVersionedTestObjectProviderFromApis(
 				containerOptions?.runtimeOptions,
 				driverConfig.type,
 			),
+			containerOptions?.minVersionForCollab,
 			[innerRequestHandler],
 		);
 	};

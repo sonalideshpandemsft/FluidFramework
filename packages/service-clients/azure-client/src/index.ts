@@ -26,7 +26,6 @@ export type {
 
 export type { ITokenProvider, ITokenResponse } from "@fluidframework/routerlicious-driver";
 export type { IUser } from "@fluidframework/driver-definitions";
-export { type ITokenClaims, ScopeType } from "@fluidframework/driver-definitions/internal";
 
 // Re-export so developers can build loggers without pulling in core-interfaces
 export type {

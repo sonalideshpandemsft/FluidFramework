@@ -11,6 +11,8 @@ import {
 	AliasResult,
 	IDataStore,
 	IFluidDataStoreChannel,
+	// eslint-disable-next-line import/no-deprecated
+	type IContainerRuntimeBaseExperimental,
 } from "@fluidframework/runtime-definitions/internal";
 import {
 	ITelemetryLoggerExt,
@@ -78,22 +80,29 @@ class DataStore implements IDataStore {
 		if (alias.includes("/")) {
 			throw new UsageError(`The alias cannot contain slashes: '${alias}'`);
 		}
+		// eslint-disable-next-line import/no-deprecated
+		const runtime = this.parentContext.containerRuntime as IContainerRuntimeBaseExperimental;
+		if (runtime.inStagingMode === true) {
+			throw new UsageError("Cannot set aliases while in staging mode");
+		}
 
 		switch (this.aliasState) {
 			// If we're already aliasing, check if it's for the same value and return
 			// the stored promise, otherwise return 'AlreadyAliased'
-			case AliasState.Aliasing:
+			case AliasState.Aliasing: {
 				assert(
 					this.aliasResult !== undefined,
 					0x316 /* There should be a cached promise of in-progress aliasing */,
 				);
 				await this.aliasResult;
 				return this.alias === alias ? "Success" : "AlreadyAliased";
+			}
 
 			// If this datastore is already aliased, return true only if this
 			// is a repeated call for the same alias
-			case AliasState.Aliased:
+			case AliasState.Aliased: {
 				return this.alias === alias ? "Success" : "AlreadyAliased";
+			}
 
 			case AliasState.None: {
 				const existingAlias = this.pendingAliases.get(alias);
@@ -108,8 +117,9 @@ class DataStore implements IDataStore {
 				break;
 			}
 
-			default:
+			default: {
 				unreachableCase(this.aliasState);
+			}
 		}
 
 		this.aliasState = AliasState.Aliasing;

@@ -1,8 +1,146 @@
 # @fluid-tools/api-markdown-documenter
 
-## 0.18.0
+## 0.21.0
+
+### `LineBreakNode` removed from `BlockContent`
+
+Block Content items are implicitly separated by a line break, so allowing `LineBreakNode`s in that context is redundant.
+Support for `LineBreakNode`s in `BlockContent` contexts has been removed.
+
+## 0.20.0
+
+### Add stronger type restrictions to Documentation Domain
+
+The Documentation Domain has been updated to be more restrictive about what kinds of content can appear under specific kinds of nodes.
+Most node kinds in the domain have been updated to better align with Markdown.
+
+System node implementations have also been marked as `@sealed` - we do not support user derivations of these types.
+If something similar to one of these types is required, a custom `DocumentationNode` implementation may be created instead.
+
+#### New extensibility model
+
+A new extensibility model has been added to the Documentation Domain to ensure users can continue to specify custom node kinds.
+Depending on the context(s) in which a custom node is intended to be used, the corresponding type-map can be updated.
+
+##### Example
+
+```typescript
+// Define custom node type
+export class CustomDocumentationNode extends DocumentationParentNodeBase<PhrasingContent> {
+	public readonly type = "custom-node";
+
+	constructor(children) {
+		super(children);
+	}
+}
+
+// Extend the `BlockContentMap` interface to include our custom node kind, so it can be used in `SectionNode`s.
+declare module "@fluid-tools/api-markdown-documenter" {
+	interface BlockContentMap {
+		"custom-node": CustomDocumentationNode;
+	}
+}
+
+// Use the custom node!
+const sectionNode: SectionNode = new SectionNode(
+	[new CustomDocumentationNode([new PlainTextNode("Hello world!")])],
+	HeadingNode.createFromPlainText("Section with custom children!"),
+);
+```
+
+### Rename "Construct Signature" headings to "Constructor" for interface API items.
+
+Updates default transformation logic for `ApiInterface` items to generate headings that read "Constructor" rather than "Construct Signature" for constructor-like members.
+This better aligns with similar policies for members like interface methods which are labeled "Method" and not "Method Signature", despite the underlying TypeScript AST entry being a "method signature".
+
+### `LayoutUtilities` function updates
+
+- `createSummaryParagraph` has been renamed to `createSummarySection`.
+  - It also now returns a `SectionNode`, rather than a `ParagraphNode` to be consistent with the other functions in `LayoutUtilities`.
+  - It has also been optimized to not create empty sections for doc comments with no summary component.
+
+- `createDeprecationNoticeSection` now returns a `SectionNode`, rather than a `ParagraphNode`.
+
+### Simplify `DocumentationNode` types
+
+Removes:
+
+- `MultiLineDocumentationNode`
+- `SingleLineDocumentationNode`
+- `SingleLineSpanNode`
+
+Updates `DocumentationNode` types that were constrained to single-line nodes to allow any `DocumentationNode` children.
+Rendering to Markdown falls back to HTML syntax in cases where multi-line content appears in relevant contexts (lists).
+
+Also updates `CodeSpanNode` to only allow plain text content, which is in line with how it is used, and how it is constrained in Markdown.
+
+## 0.19.0
+
+### Add the ability to filter out individual API items (and their descendants) from documentation generation
+
+A new property `exclude` has been added to the options for documentation suite generation.
+This can be used to omit API items (and their descendants) from documentation generation.
+
+#### Example
+
+My repo uses a custom `TSDoc` tag `@hideDocs` for API items we don't wish to include in public documentation.
+To exclude such items, I could provide the following in my configuration:
+
+```typescript
+exclude: (apiItem) => {
+	return ApiItemUtilities.hasModifierTag(apiItem, "@hideDocs");
+};
+```
 
 ### ⚠ BREAKING CHANGES
+
+#### `skipPackage` option has been removed
+
+With the addition of `exclude`, `skipPackage` has been removed.
+This usage can be migrated as follows:
+
+```typescript
+skipPackage: (packageItem) => {
+    ...
+}
+```
+
+becomes
+
+```typescript
+exclude: (apiItem) => {
+    if (apiItem.kind === ApiItemKind.Package) {
+        ...
+    } else {
+        return false;
+    }
+}
+```
+
+#### `ApiItemUtilities.getReleaseTag` has been removed
+
+This function would get the exact release tag with which the corresponding API item was annotated.
+This is not generally useful information, however, as it does not account for inheritance.
+
+E.g., if an item was untagged, but its parent was tagged with `@beta`, this API would have returned `None`.
+
+Additionally, consider the following malformed case: an interface is tagged as `@public`, but its parent namespace is tagged as `@beta`.
+The effective release level of the interface should be `Beta`, not `Public`.
+
+A new API, `ApiItemUtilities.getEffectiveReleaseLevel` can now be used to get the appropriate release level of an item, accounting for inheritance.
+
+## 0.18.0
+
+-   The default suite structure has been updated as follows:
+    -   `Package` and `Namespace` items now generate documents _inside_ of their own folder hierarchy, yielding documents named "index".
+    -   `Enum` and `TypeAlias` items now generate their own documents (rather than being rendered as sections under their parent document).
+-   `uriRoot` parameter is now optional.
+    The default value is "".
+
+### ⚠ BREAKING CHANGES
+
+The default output format has been updated, as noted above.
+Additionally...
 
 #### Simplify the parameters given to `MarkdownRenderer` and `HtmlRenderer` methods.
 
@@ -25,7 +163,7 @@ const apiModel = await loadModel({
 
 const transformConfig = {
 	apiModel,
-	uriRoot: ".",
+	uriRoot: "",
 };
 
 await MarkdownRenderer.renderApiModel(transformConfig, {}, { outputDirectoryPath });
@@ -46,7 +184,7 @@ const apiModel = await loadModel({
 
 await MarkdownRenderer.renderApiModel({
 	apiModel,
-	uriRoot: ".",
+	uriRoot: "", // Note: this parameter is also now optional. Default: "".
 	outputDirectoryPath,
 });
 ```

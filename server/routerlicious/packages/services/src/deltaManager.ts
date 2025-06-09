@@ -8,6 +8,8 @@ import { ISequencedDocumentMessage, ScopeType } from "@fluidframework/protocol-d
 import { BasicRestWrapper } from "@fluidframework/server-services-client";
 import { IDeltaService, type ITenantManager } from "@fluidframework/server-services-core";
 import { getGlobalTelemetryContext } from "@fluidframework/server-services-telemetry";
+import { logHttpMetrics } from "@fluidframework/server-services-utils";
+
 import { getRefreshTokenIfNeededCallback, TenantManager } from "./tenant";
 
 /**
@@ -116,6 +118,8 @@ export class DeltaManager implements IDeltaService {
 			() => getGlobalTelemetryContext().getProperties().correlationId /* getCorrelationId */,
 			() => getGlobalTelemetryContext().getProperties() /* getTelemetryContextProperties */,
 			refreshTokenIfNeeded,
+			logHttpMetrics,
+			() => getGlobalTelemetryContext().getProperties().serviceName ?? "" /* serviceName */,
 		);
 		return restWrapper;
 	}

@@ -17,6 +17,8 @@ import {
 	getLumberBaseProperties,
 	getGlobalTelemetryContext,
 } from "@fluidframework/server-services-telemetry";
+import { logHttpMetrics } from "@fluidframework/server-services-utils";
+
 import { getRefreshTokenIfNeededCallback } from "./tenant";
 
 /**
@@ -150,6 +152,8 @@ export class DocumentManager implements IDocumentManager {
 			() => getGlobalTelemetryContext().getProperties().correlationId /* getCorrelationId */,
 			() => getGlobalTelemetryContext().getProperties() /* getTelemetryContextProperties */,
 			refreshTokenIfNeeded /* refreshTokenIfNeeded */,
+			logHttpMetrics,
+			() => getGlobalTelemetryContext().getProperties().serviceName ?? "" /* serviceName */,
 		);
 		return restWrapper;
 	}

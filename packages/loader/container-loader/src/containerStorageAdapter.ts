@@ -23,8 +23,7 @@ import {
 import { isInstanceOfISnapshot, UsageError } from "@fluidframework/driver-utils/internal";
 import { ITelemetryLoggerExt } from "@fluidframework/telemetry-utils/internal";
 
-// eslint-disable-next-line import/no-deprecated
-import { IDetachedBlobStorage } from "./loader.js";
+import type { MemoryDetachedBlobStorage } from "./memoryBlobStorage.js";
 import { ProtocolTreeStorageService } from "./protocolTreeDocumentStorageService.js";
 import { RetriableDocumentStorageService } from "./retriableDocumentStorageService.js";
 import type {
@@ -80,8 +79,7 @@ export class ContainerStorageAdapter
 	 * @param enableSummarizeProtocolTree - Enable uploading a protocol summary. Note: preference is given to service policy's "summarizeProtocolTree" before this value.
 	 */
 	public constructor(
-		// eslint-disable-next-line import/no-deprecated
-		detachedBlobStorage: IDetachedBlobStorage | undefined,
+		detachedBlobStorage: MemoryDetachedBlobStorage | undefined,
 		private readonly logger: ITelemetryLoggerExt,
 		/**
 		 * ArrayBufferLikes or utf8 encoded strings, containing blobs from a snapshot
@@ -214,7 +212,7 @@ export class ContainerStorageAdapter
 	}
 
 	public async readBlob(id: string): Promise<ArrayBufferLike> {
-		const maybeBlob: string | ArrayBufferLike | undefined = this.blobContents[id];
+		const maybeBlob = this.blobContents[id];
 		if (maybeBlob !== undefined) {
 			if (typeof maybeBlob === "string") {
 				const blob = stringToBuffer(maybeBlob, "utf8");
@@ -258,8 +256,7 @@ export class ContainerStorageAdapter
  */
 class BlobOnlyStorage implements IDocumentStorageService {
 	constructor(
-		// eslint-disable-next-line import/no-deprecated
-		private readonly detachedStorage: IDetachedBlobStorage | undefined,
+		private readonly detachedStorage: MemoryDetachedBlobStorage | undefined,
 		private readonly logger: ITelemetryLoggerExt,
 	) {}
 
@@ -271,8 +268,7 @@ class BlobOnlyStorage implements IDocumentStorageService {
 		return this.verifyStorage().readBlob(blobId);
 	}
 
-	// eslint-disable-next-line import/no-deprecated
-	private verifyStorage(): IDetachedBlobStorage {
+	private verifyStorage(): MemoryDetachedBlobStorage {
 		if (this.detachedStorage === undefined) {
 			throw new UsageError("Real storage calls not allowed in Unattached container");
 		}
@@ -361,7 +357,7 @@ async function getBlobManagerTreeFromTree(
 	blobs: ISerializableBlobContents,
 	storage: Pick<IDocumentStorageService, "readBlob">,
 ): Promise<void> {
-	const id: string | undefined = tree.blobs[redirectTableBlobName];
+	const id = tree.blobs[redirectTableBlobName];
 	assert(id !== undefined, 0x9ce /* id is undefined in getBlobManagerTreeFromTree */);
 	const blob = await storage.readBlob(id);
 	// ArrayBufferLike will not survive JSON.stringify()
@@ -404,7 +400,7 @@ function getBlobManagerTreeFromTreeWithBlobContents(
 	tree: ISnapshotTreeWithBlobContents,
 	blobs: ISerializableBlobContents,
 ): void {
-	const id: string | undefined = tree.blobs[redirectTableBlobName];
+	const id = tree.blobs[redirectTableBlobName];
 	assert(
 		id !== undefined,
 		0x9cf /* id is undefined in getBlobManagerTreeFromTreeWithBlobContents */,
