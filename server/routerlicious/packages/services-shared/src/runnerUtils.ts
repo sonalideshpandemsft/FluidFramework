@@ -63,13 +63,41 @@ export async function runnerHttpServerStop(
 	};
 	try {
 		runnerMetric.setProperties(runnerMetricProperties);
+		Lumberjack.info("Attempting to stop HTTP server", runnerMetricProperties);
+
+		const closePromise =
+			typeof server?.close === "function" || server !== undefined
+				? Promise.resolve().then(async () => {
+						Lumberjack.info(
+							"runnerHttpServerStop: calling server.close()",
+							runnerMetricProperties,
+						);
+						await server.close();
+				  })
+				: Promise.resolve();
+
+		Lumberjack.info("runnerHttpServerStop: waiting for server to close with timeout", {
+			...runnerMetricProperties,
+			timeoutMs: runnerServerCloseTimeoutMs,
+		});
+
 		// Close the underlying server and then resolve the runner once closed
-		await promiseTimeout(runnerServerCloseTimeoutMs, server?.close() ?? Promise.resolve());
+		await promiseTimeout(runnerServerCloseTimeoutMs, closePromise);
+		Lumberjack.info("runnerHttpServerStop: server closed successfully", runnerMetricProperties);
+
 		if (caller === "uncaughtException") {
+			Lumberjack.warning(
+				"runnerHttpServerStop: rejecting deferred due to uncaughtException",
+				{
+					...runnerMetricProperties,
+					uncaughtException: uncaughtException?.message ?? "unknown",
+				},
+			);
 			runningDeferredPromise?.reject({
 				uncaughtException: serializeError(uncaughtException),
 			}); // reject the promise so that the runService exits the process with exit(1)
 		} else {
+			Lumberjack.info("runnerHttpServerStop: resolving deferred", runnerMetricProperties);
 			runningDeferredPromise?.resolve();
 		}
 		if (!runnerMetric.isCompleted()) {

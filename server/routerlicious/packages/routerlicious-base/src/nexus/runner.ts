@@ -140,6 +140,7 @@ export class NexusRunner implements IRunner {
 		}
 
 		const httpServer = this.server.httpServer;
+		// throw error after 5mins of start
 		httpServer.on("error", (error) => this.onError(error));
 		httpServer.on("listening", () => this.onListening());
 		httpServer.on("upgrade", (req, socket, initialMsgBuffer) =>
@@ -172,6 +173,8 @@ export class NexusRunner implements IRunner {
 
 		const runnerServerCloseTimeoutMs =
 			this.config.get("shared:runnerServerCloseTimeoutMs") ?? 30000;
+
+		Lumberjack.info("Initiating server shutdown...");
 
 		await runnerHttpServerStop(
 			this.server,
