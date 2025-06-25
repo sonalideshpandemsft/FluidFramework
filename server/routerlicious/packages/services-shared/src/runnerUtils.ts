@@ -57,22 +57,28 @@ export async function runnerHttpServerStop(
 	caller: string | undefined,
 	uncaughtException: any | undefined,
 ): Promise<void> {
+	Lumberjack.info("Nexus.stop runnerHttpServerStop");
 	const runnerMetricProperties = {
 		caller,
 		runnerServerCloseTimeoutMs,
 	};
+	Lumberjack.info("Nexus.stop runnerMetricProperties", runnerMetricProperties);
 	try {
 		runnerMetric.setProperties(runnerMetricProperties);
 		// Close the underlying server and then resolve the runner once closed
 		await promiseTimeout(runnerServerCloseTimeoutMs, server?.close() ?? Promise.resolve());
+		Lumberjack.info("Nexus promiseTimeout done");
 		if (caller === "uncaughtException") {
+			Lumberjack.info("Nexus uncaught exception");
 			runningDeferredPromise?.reject({
 				uncaughtException: serializeError(uncaughtException),
 			}); // reject the promise so that the runService exits the process with exit(1)
 		} else {
+			Lumberjack.info("Nexus uncaughtException else");
 			runningDeferredPromise?.resolve();
 		}
 		if (!runnerMetric.isCompleted()) {
+			Lumberjack.info("Nexus runnerMetric is completed");
 			runnerMetric.success(`${runnerMetric.eventName} stopped`);
 		} else {
 			Lumberjack.info(`${runnerMetric.eventName} stopped`, runnerMetricProperties);

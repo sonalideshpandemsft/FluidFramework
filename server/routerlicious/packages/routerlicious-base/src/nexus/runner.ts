@@ -159,6 +159,7 @@ export class NexusRunner implements IRunner {
 		if (this.startupCheck.setReady) {
 			this.startupCheck.setReady();
 		}
+		// this.scheduleAutoShutdown(5 * 60 * 1000); // 5 minutes
 		return this.runningDeferred.promise;
 	}
 
@@ -173,14 +174,38 @@ export class NexusRunner implements IRunner {
 		const runnerServerCloseTimeoutMs =
 			this.config.get("shared:runnerServerCloseTimeoutMs") ?? 30000;
 
+		Lumberjack.info("Nexusrunner.stop timeoutms", runnerServerCloseTimeoutMs);
+
 		await runnerHttpServerStop(
 			this.server,
 			this.runningDeferred,
-			runnerServerCloseTimeoutMs,
+			600_000,
 			this.runnerMetric,
 			caller,
 			uncaughtException,
 		);
+	}
+
+	public scheduleAutoShutdown(timeoutMs: number): void {
+		Lumberjack.info(`Scheduling auto-shutdown in ${timeoutMs / 1000} seconds`);
+
+		setTimeout(() => {
+			Lumberjack.info("Auto-shutdown timeout reached: initiating shutdown");
+
+			if (!this.stopped) {
+				runnerHttpServerStop(
+					this.server,
+					this.runningDeferred,
+					timeoutMs,
+					this.runnerMetric,
+					undefined,
+					undefined,
+				).catch((error) => {
+					Lumberjack.error("Auto-shutdown failed", undefined, error);
+					process.exit(1);
+				});
+			}
+		}, timeoutMs);
 	}
 
 	/**

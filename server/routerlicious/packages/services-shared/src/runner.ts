@@ -60,10 +60,20 @@ export async function run<T extends IResources>(
 
 	process.on("SIGTERM", () => {
 		Lumberjack.info(`Received SIGTERM request to stop the service.`);
-		runner.stop("sigterm").catch((error) => {
-			logger?.error(`Could not stop runner after SIGTERM due to error: ${error}`);
-			Lumberjack.error(`Could not stop runner after SIGTERM due to error`, undefined, error);
-		});
+		runner
+			.stop("sigterm")
+			.then((res) => {
+				Lumberjack.info("Runner stopped successfully after SIGTERM");
+			})
+			.catch((error) => {
+				Lumberjack.info(`Received SIGTERM request to stop the service error ${error}`);
+				logger?.error(`Could not stop runner after SIGTERM due to error: ${error}`);
+				Lumberjack.error(
+					`Could not stop runner after SIGTERM due to error`,
+					undefined,
+					error,
+				);
+			});
 	});
 
 	process.on("uncaughtException", (uncaughtException, origin) => {
@@ -82,6 +92,10 @@ export async function run<T extends IResources>(
 				innerError,
 			);
 		});
+	});
+
+	process.on("SIGSTOP", () => {
+		Lumberjack.info(`Received SIGSTOP request to stop the service.`);
 	});
 
 	process.on("SIGINT", () => {
