@@ -1391,17 +1391,19 @@ function mixinRestartClientFromPendingState<TOperation extends BaseOperation>(
 			const { clients, random, validationClient } = state;
 			const anyClientInStaging = clients.some((c) => c.entryPoint.inStagingMode());
 
+			const restartableClients = clients.filter((c) => !c.entryPoint.inStagingMode());
+
 			if (
 				options.clientJoinOptions !== undefined &&
 				validationClient.container.attachState !== AttachState.Detached &&
-				clients.length > 0 &&
+				restartableClients.length > 0 &&
 				random.bool(options.clientJoinOptions.clientAddProbability) &&
 				// AB#45904: Clarify restart-from-pending behavior in staging mode
 				!anyClientInStaging
 			) {
 				return {
 					type: "restartClientFromPendingState",
-					sourceClientTag: random.pick(clients).tag,
+					sourceClientTag: random.pick(restartableClients).tag,
 					newClientTag: state.tag("client"),
 				} satisfies RestartClientFromPendingState;
 			}
