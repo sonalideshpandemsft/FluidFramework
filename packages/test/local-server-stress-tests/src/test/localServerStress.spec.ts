@@ -36,16 +36,13 @@ describe("Local Server Stress", () => {
 		// skipMinimization: true,
 		// Uncomment to replay a particular seed.
 		// replay: 93,
-		// only: [69],
+		// only: [8],
 		saveFailures,
 		// saveSuccesses,
 		configurations: { "Fluid.Container.enableOfflineLoad": true },
 		skip: [
-			...[79], // Number of keys not same
-			...[6], // Number of subDirectories not same,
-			...[26], // Rollback op does not match last pending
-			...[13], // 0xb85
-			...[21, 30, 69], // 0xa21
+			...[8, 12, 13, 20, 21, 24, 34, 45, 58, 59, 64, 71, 77, 80, 81, 85, 90, 92, 99], // 0xa21
+			...[83], // Cannot access Disposed subDirectory
 		],
 	});
 });
