@@ -20,6 +20,8 @@ import type { DDSFuzzModel, DDSFuzzTestState } from "@fluid-private/test-dds-uti
 import type { ITaskManager } from "../interfaces.js";
 import { TaskManagerFactory } from "../taskManagerFactory.js";
 
+import { hasTaskManagerOracle } from "./taskManagerOracle.js";
+
 /**
  * Default options for TaskManager fuzz testing
  */
@@ -268,6 +270,15 @@ export const baseTaskManagerModel: DDSFuzzModel<TaskManagerFactory, Operation, F
 			// makeReducer supports a param for logging output which tracks the provided intervalId over time:
 			// { taskManagerNames: ["A", "B", "C"], taskId: "" },
 			makeReducer(),
-		validateConsistency: (a, b) => assertEqualTaskManagers(a.channel, b.channel),
+		validateConsistency: (a, b) => {
+			if (hasTaskManagerOracle(a.channel)) {
+				a.channel.taskManagerOracle.validate();
+			}
+
+			if (hasTaskManagerOracle(b.channel)) {
+				b.channel.taskManagerOracle.validate();
+			}
+			assertEqualTaskManagers(a.channel, b.channel);
+		},
 		factory: new TaskManagerFactory(),
 	};
