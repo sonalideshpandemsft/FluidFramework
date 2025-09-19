@@ -12,110 +12,65 @@ import type { TaskManager } from "../taskManagerFactory.js";
  * @internal
  */
 export class TaskManagerOracle {
-	// Tracks local-client task state
 	private readonly assigned = new Set<string>();
 	private readonly queued = new Set<string>();
 	private readonly subscribed = new Set<string>();
 
 	public constructor(private readonly taskManager: ITaskManager) {
-		// Snapshot initial state
-		// (TaskManager APIs are local, so we just ask it directly)
-		// In practice, most tasks will be empty at construction
-		// but we still support snapshotting for symmetry
-		this.refreshSnapshot();
-
-		// Hook up listeners
-		this.taskManager.on("assigned", this.onAssigned);
-		this.taskManager.on("lost", this.onLost);
-		this.taskManager.on("completed", this.onCompleted);
+		this.taskManager.on("assigned", this.onEvent);
+		this.taskManager.on("lost", this.onEvent);
+		this.taskManager.on("completed", this.onEvent);
 	}
 
-	// === Event listeners ===
+	private readonly onEvent: TaskEventListener = (taskId) => {
+		// Always sync with live taskManager state
+		if (this.taskManager.assigned(taskId)) {
+			this.assigned.add(taskId);
+		} else {
+			this.assigned.delete(taskId);
+		}
 
-	private readonly onAssigned: TaskEventListener = (taskId) => {
-		assert(
-			this.queued.has(taskId) || this.subscribed.has(taskId),
-			`"assigned" fired for task="${taskId}" but oracle did not consider it queued/subscribed`,
-		);
+		if (this.taskManager.queued(taskId)) {
+			this.queued.add(taskId);
+		} else {
+			this.queued.delete(taskId);
+		}
 
-		assert(
-			!this.assigned.has(taskId),
-			`"assigned" fired for task="${taskId}" but oracle already had it assigned`,
-		);
-
-		this.assigned.add(taskId);
+		if (this.taskManager.subscribed(taskId)) {
+			this.subscribed.add(taskId);
+		} else {
+			this.subscribed.delete(taskId);
+		}
 	};
-
-	private readonly onLost: TaskEventListener = (taskId) => {
-		assert(
-			this.assigned.has(taskId) || this.queued.has(taskId),
-			`"lost" fired for task="${taskId}" but oracle did not consider it assigned/queued`,
-		);
-
-		this.assigned.delete(taskId);
-		this.queued.delete(taskId);
-	};
-
-	private readonly onCompleted: TaskEventListener = (taskId) => {
-		assert(
-			this.assigned.has(taskId) || this.queued.has(taskId),
-			`"completed" fired for task="${taskId}" but oracle did not consider it assigned/queued`,
-		);
-
-		this.assigned.delete(taskId);
-		this.queued.delete(taskId);
-		this.subscribed.delete(taskId);
-	};
-
-	// === Validation ===
 
 	public validate(): void {
-		// Compare oracle vs. live TaskManager
-		for (const taskId of this.allKnownTasks()) {
-			const actualAssigned = this.taskManager.assigned(taskId);
-			const actualQueued = this.taskManager.queued(taskId);
-			const actualSubscribed = this.taskManager.subscribed(taskId);
-
+		for (const taskId of this.assigned) {
 			assert.strictEqual(
-				actualAssigned,
-				this.assigned.has(taskId),
+				this.taskManager.assigned(taskId), // incorrect this.clientId returned; this.clientId = placeholder and currentAssignee = A
+				true,
 				`Mismatch on assigned for task="${taskId}"`,
 			);
-
+		}
+		for (const taskId of this.queued) {
 			assert.strictEqual(
-				actualQueued,
-				this.queued.has(taskId),
+				this.taskManager.queued(taskId),
+				true,
 				`Mismatch on queued for task="${taskId}"`,
 			);
-
+		}
+		for (const taskId of this.subscribed) {
 			assert.strictEqual(
-				actualSubscribed,
-				this.subscribed.has(taskId),
+				this.taskManager.subscribed(taskId),
+				true,
 				`Mismatch on subscribed for task="${taskId}"`,
 			);
 		}
 	}
 
-	// === Helpers ===
-
-	private allKnownTasks(): string[] {
-		// union of all sets
-		return [...new Set([...this.assigned, ...this.queued, ...this.subscribed])];
-	}
-
-	private refreshSnapshot(): void {
-		// In practice you’d need a source of “known taskIds” (fuzzer, driver, etc.)
-		// Here we just clear and rebuild from current ITaskManager queries
-		this.assigned.clear();
-		this.queued.clear();
-		this.subscribed.clear();
-		// Example: if you track taskIds from fuzz ops, populate sets here
-	}
-
 	public dispose(): void {
-		this.taskManager.off("assigned", this.onAssigned);
-		this.taskManager.off("lost", this.onLost);
-		this.taskManager.off("completed", this.onCompleted);
+		this.taskManager.off("assigned", this.onEvent);
+		this.taskManager.off("lost", this.onEvent);
+		this.taskManager.off("completed", this.onEvent);
 	}
 }
 

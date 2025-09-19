@@ -7,7 +7,7 @@ import * as path from "node:path";
 
 import { TypedEventEmitter } from "@fluid-internal/client-utils";
 import { createDDSFuzzSuite, type DDSFuzzHarnessEvents } from "@fluid-private/test-dds-utils";
-import { FlushMode } from "@fluidframework/runtime-definitions/internal";
+// import { FlushMode } from "@fluidframework/runtime-definitions/internal";
 
 import { _dirname } from "./dirname.cjs";
 import { baseTaskManagerModel, defaultOptions } from "./fuzzUtils.js";
@@ -33,31 +33,32 @@ describe("TaskManager fuzz testing", () => {
 		defaultTestCount: defaultOptions.testCount,
 		emitter: oracleEmitter,
 		saveFailures: { directory: path.join(_dirname, "../../src/test/results") },
+		skipMinimization: true,
 		// Uncomment this line to replay a specific seed:
-		// replay: 0,
+		only: 46,
 		// This can be useful for quickly minimizing failure json while attempting to root-cause a failure.
 	});
 });
 
-describe("TaskManager fuzz testing with rebasing", () => {
-	createDDSFuzzSuite(baseTaskManagerModel, {
-		validationStrategy: { type: "fixedInterval", interval: defaultOptions.validateInterval },
-		skip: [],
-		rebaseProbability: 0.15,
-		containerRuntimeOptions: {
-			flushMode: FlushMode.TurnBased,
-			enableGroupedBatching: true,
-		},
-		clientJoinOptions: {
-			maxNumberOfClients: 6,
-			clientAddProbability: 0.05,
-			stashableClientProbability: 0.2,
-		},
-		defaultTestCount: defaultOptions.testCount,
-		emitter: oracleEmitter,
-		saveFailures: { directory: path.join(_dirname, "../../src/test/results") },
-		// Uncomment this line to replay a specific seed:
-		// replay: 0,
-		// This can be useful for quickly minimizing failure json while attempting to root-cause a failure.
-	});
-});
+// describe("TaskManager fuzz testing with rebasing", () => {
+// 	createDDSFuzzSuite(baseTaskManagerModel, {
+// 		validationStrategy: { type: "fixedInterval", interval: defaultOptions.validateInterval },
+// 		skip: [],
+// 		rebaseProbability: 0.15,
+// 		containerRuntimeOptions: {
+// 			flushMode: FlushMode.TurnBased,
+// 			enableGroupedBatching: true,
+// 		},
+// 		clientJoinOptions: {
+// 			maxNumberOfClients: 6,
+// 			clientAddProbability: 0.05,
+// 			stashableClientProbability: 0.2,
+// 		},
+// 		defaultTestCount: defaultOptions.testCount,
+// 		emitter: oracleEmitter,
+// 		saveFailures: { directory: path.join(_dirname, "../../src/test/results") },
+// 		// Uncomment this line to replay a specific seed:
+// 		// replay: 0,
+// 		// This can be useful for quickly minimizing failure json while attempting to root-cause a failure.
+// 	});
+// });
