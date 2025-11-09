@@ -6,7 +6,11 @@
 import * as dirPath from "node:path";
 
 import { takeAsync } from "@fluid-private/stochastic-test-utils";
-import { type DDSFuzzModel, createDDSFuzzSuite } from "@fluid-private/test-dds-utils";
+import {
+	type DDSFuzzHarnessEvents,
+	type DDSFuzzModel,
+	createDDSFuzzSuite,
+} from "@fluid-private/test-dds-utils";
 import { FlushMode } from "@fluidframework/runtime-definitions/internal";
 
 import { DirectoryFactory } from "../../index.js";
@@ -21,6 +25,18 @@ import {
 	type DirOperation,
 	type DirOperationGenerationConfig,
 } from "./fuzzUtils.js";
+import { TypedEventEmitter } from "@fluid-internal/client-utils";
+import { SharedDirectoryOracle } from "../directoryOracle.js";
+import type { ISharedDirectoryWithOracle } from "./oracleUtils.js";
+
+const oracleEmitter = new TypedEventEmitter<DDSFuzzHarnessEvents>();
+
+oracleEmitter.on("clientCreate", (client) => {
+	const channel = client.channel as ISharedDirectoryWithOracle;
+
+	const dirOracle = new SharedDirectoryOracle(channel);
+	channel.directoryOracle = dirOracle;
+});
 
 describe("SharedDirectory fuzz Create/Delete concentrated", () => {
 	const options: DirOperationGenerationConfig = {
@@ -55,6 +71,7 @@ describe("SharedDirectory fuzz Create/Delete concentrated", () => {
 			clientAddProbability: 0.08,
 			stashableClientProbability: 0.2,
 		},
+		emitter: oracleEmitter,
 		defaultTestCount: 25,
 		// Uncomment this line to replay a specific seed from its failure file:
 		// replay: 21,
@@ -76,6 +93,7 @@ describe("SharedDirectory fuzz Create/Delete concentrated", () => {
 				flushMode: FlushMode.TurnBased,
 				enableGroupedBatching: true,
 			},
+			emitter: oracleEmitter,
 			numberOfClients: 3,
 			clientJoinOptions: {
 				maxNumberOfClients: 3,
@@ -108,6 +126,7 @@ describe("SharedDirectory fuzz", () => {
 			stashableClientProbability: 0.2,
 		},
 		defaultTestCount: 25,
+		emitter: oracleEmitter,
 		// Uncomment this line to replay a specific seed from its failure file:
 		// replay: 0,
 		saveFailures: { directory: dirPath.join(_dirname, "../../../src/test/mocha/results/2") },
@@ -128,6 +147,7 @@ describe("SharedDirectory fuzz", () => {
 				enableGroupedBatching: true,
 			},
 			numberOfClients: 3,
+			emitter: oracleEmitter,
 			clientJoinOptions: {
 				// Note: if tests are slow, we may want to tune this down. This mimics behavior before this suite
 				// was refactored to use the DDS fuzz harness.
