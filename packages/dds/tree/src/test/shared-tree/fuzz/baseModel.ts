@@ -3,7 +3,13 @@
  * Licensed under the MIT License.
  */
 
-import type { DDSFuzzModel, DDSFuzzTestState } from "@fluid-private/test-dds-utils";
+import { TypedEventEmitter } from "@fluid-internal/client-utils";
+import {
+	type DDSFuzzModel,
+	type DDSFuzzTestState,
+	registerOracle,
+	type DDSFuzzHarnessEvents,
+} from "@fluid-private/test-dds-utils";
 import { validateFuzzTreeConsistency } from "../../utils.js";
 import { fuzzReducer } from "./fuzzEditReducers.js";
 import { SharedTreeFuzzTestFactory, createOnCreate } from "./fuzzUtils.js";
@@ -12,6 +18,20 @@ import { takeAsync } from "@fluid-private/stochastic-test-utils";
 import { type EditGeneratorOpWeights, makeOpGenerator } from "./fuzzEditGenerators.js";
 import { ForestTypeOptimized, ForestTypeReference } from "../../../shared-tree/index.js";
 import { pkgVersion } from "../../../packageVersion.js";
+import {
+	SharedTreeOracle,
+	hasSharedTreeOracle,
+	type ISharedTreeWithOracle,
+} from "./treeOracle.js";
+
+const oracleEmitter = new TypedEventEmitter<DDSFuzzHarnessEvents>();
+
+oracleEmitter.on("clientCreate", (client) => {
+	const tree = client.channel as ISharedTreeWithOracle;
+	const sharedTreeOracle = new SharedTreeOracle(tree);
+	tree.sharedTreeOracle = sharedTreeOracle;
+	registerOracle(sharedTreeOracle);
+});
 
 export const runsPerBatch = 50;
 // TODO: Enable other types of ops.
@@ -34,6 +54,22 @@ const editGeneratorOpWeights: Partial<EditGeneratorOpWeights> = {
 };
 const generatorFactory = () => takeAsync(100, makeOpGenerator(editGeneratorOpWeights));
 
+function validateTreeConsistency(
+	a: DDSFuzzTestState<SharedTreeFuzzTestFactory>["client"],
+	b: DDSFuzzTestState<SharedTreeFuzzTestFactory>["client"],
+): void {
+	// Validate oracles first
+	if (hasSharedTreeOracle(a.channel)) {
+		a.channel.sharedTreeOracle.validate();
+	}
+	if (hasSharedTreeOracle(b.channel)) {
+		b.channel.sharedTreeOracle.validate();
+	}
+
+	// Then validate tree consistency
+	validateFuzzTreeConsistency(a, b);
+}
+
 export const baseTreeModel: DDSFuzzModel<
 	SharedTreeFuzzTestFactory,
 	Operation,
@@ -46,7 +82,7 @@ export const baseTreeModel: DDSFuzzModel<
 	}),
 	generatorFactory,
 	reducer: fuzzReducer,
-	validateConsistency: validateFuzzTreeConsistency,
+	validateConsistency: validateTreeConsistency,
 };
 
 export const optimizedForestTreeModel: DDSFuzzModel<
@@ -61,5 +97,7 @@ export const optimizedForestTreeModel: DDSFuzzModel<
 	}),
 	generatorFactory,
 	reducer: fuzzReducer,
-	validateConsistency: validateFuzzTreeConsistency,
+	validateConsistency: validateTreeConsistency,
 };
+
+export { oracleEmitter };

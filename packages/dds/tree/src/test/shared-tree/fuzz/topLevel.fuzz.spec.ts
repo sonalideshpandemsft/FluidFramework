@@ -18,7 +18,12 @@ import {
 	SharedTreeFuzzTestFactory,
 } from "./fuzzUtils.js";
 import type { Operation } from "./operationTypes.js";
-import { baseTreeModel, optimizedForestTreeModel, runsPerBatch } from "./baseModel.js";
+import {
+	baseTreeModel,
+	optimizedForestTreeModel,
+	oracleEmitter,
+	runsPerBatch,
+} from "./baseModel.js";
 
 const baseOptions: Partial<DDSFuzzSuiteOptions> = {
 	numberOfClients: 3,
@@ -62,6 +67,7 @@ describe("Fuzz - Top-Level", () => {
 			},
 			reconnectProbability: 0.1,
 			idCompressorFactory: deterministicIdCompressorFactory(0xdeadbeef),
+			emitter: oracleEmitter,
 			skip: [
 				...[30], //  0x92a
 			],
@@ -87,6 +93,7 @@ describe("Fuzz - Top-Level", () => {
 			},
 			reconnectProbability: 0.1,
 			idCompressorFactory: deterministicIdCompressorFactory(0xdeadbeef),
+			emitter: oracleEmitter,
 			skip: [
 				...[30], //  0x92a
 			],
