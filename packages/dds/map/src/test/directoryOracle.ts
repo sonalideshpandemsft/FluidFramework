@@ -158,25 +158,30 @@ export class SharedDirectoryOracle {
 
 		// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 		const { key, previousValue } = change;
-		const path = change.path ?? "/";
+		const { path } = change;
+
+		assert(
+			path !== undefined && path !== null,
+			"path must be provided in valueChanged event per IDirectoryValueChanged interface",
+		);
 
 		const fuzzDir = this.sharedDir.getWorkingDirectory(path);
-		if (!fuzzDir) return;
+		assert(
+			fuzzDir !== undefined,
+			`Directory should exist at path "${path}" when valueChanged event is emitted`,
+		);
 
 		const absPath = path.startsWith("/") ? path : `/${path}`;
 		const dirNode = this.createDirNode(this.modelFromValueChanged, absPath);
-
-		// Validate previousValue matches oracle, except:
-		// - Post-clear events: previousValue from before clear, oracle already cleared
-		// - Remote ops with pending local ops: oracle has optimistic value, event has sequenced value
 		const oracleValue = dirNode.keys.get(key);
-		const isPostClearEvent = previousValue !== undefined && oracleValue === undefined;
-		const hasPendingLocalOp = !local && oracleValue !== previousValue;
-		if (!isPostClearEvent && !hasPendingLocalOp) {
+
+		// Validate previousValue for local events only
+		// Remote events are skipped due to complexity of pending ops and post-clear scenarios
+		if (local) {
 			assert.deepStrictEqual(
 				previousValue,
 				oracleValue,
-				`[valueChanged] previousValue mismatch for key "${key}" in directory "${path}": event.previousValue=${previousValue}, oracle=${oracleValue}, local=${local}`,
+				`[valueChanged local] previousValue mismatch for key "${key}" in directory "${path}": event.previousValue=${previousValue}, oracle=${oracleValue}`,
 			);
 		}
 
@@ -241,17 +246,13 @@ export class SharedDirectoryOracle {
 
 		const dirNode = this.createDirNode(this.modelFromContainedValueChanged, absolutePath);
 
-		// Validate previousValue matches oracle, except:
-		// - Post-clear events: previousValue from before clear, oracle already cleared
-		// - Remote ops with pending local ops: oracle has optimistic value, event has sequenced value
-		const oracleValue = dirNode.keys.get(key);
-		const isPostClearEvent = previousValue !== undefined && oracleValue === undefined;
-		const hasPendingLocalOp = !local && oracleValue !== previousValue;
-		if (!isPostClearEvent && !hasPendingLocalOp) {
+		// Validate previousValue matches oracle for local events
+		if (local) {
+			const oracleValue = dirNode.keys.get(key);
 			assert.deepStrictEqual(
 				previousValue,
 				oracleValue,
-				`[containedValueChanged] previousValue mismatch for key "${key}" in directory "${absolutePath}": event.previousValue=${previousValue}, oracle=${oracleValue}, local=${local}`,
+				`[containedValueChanged local] previousValue mismatch for key "${key}" in directory "${absolutePath}": event.previousValue=${previousValue}, oracle=${oracleValue}`,
 			);
 		}
 

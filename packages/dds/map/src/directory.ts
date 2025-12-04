@@ -1912,19 +1912,27 @@ class SubDirectory extends TypedEventEmitter<IDirectoryEvents> implements IDirec
 				this.directory.emit("clearInternal", this.absolutePath, local, this.directory);
 			}
 
-			// For pending set operations, emit valueChanged events
+			// For pending set operations, emit valueChanged and containedValueChanged events
 			// Include 'path' so listeners can identify which subdirectory the change occurred in
-			for (const { key, previousValue } of pendingSets) {
-				this.directory.emit(
-					"valueChanged",
-					{
-						key,
-						path: this.absolutePath,
-						previousValue,
-					},
-					local,
-					this.directory,
-				);
+			// Only emit if this subdirectory hasn't been disposed and is still reachable from root
+			if (
+				!this.disposed &&
+				this.directory.getWorkingDirectory(this.absolutePath) !== undefined
+			) {
+				for (const { key, previousValue } of pendingSets) {
+					this.directory.emit(
+						"valueChanged",
+						{
+							key,
+							path: this.absolutePath,
+							previousValue,
+						},
+						local,
+						this.directory,
+					);
+					const containedEvent: IValueChanged = { key, previousValue };
+					this.emit("containedValueChanged", containedEvent, local, this);
+				}
 			}
 		}
 	}
@@ -1965,8 +1973,11 @@ class SubDirectory extends TypedEventEmitter<IDirectoryEvents> implements IDirec
 		} else {
 			const previousValue: unknown = this.sequencedStorageData.get(op.key);
 			this.sequencedStorageData.delete(op.key);
-			// Suppress the event if local changes would cause the incoming change to be invisible optimistically.
+			// Suppress the event if local changes would cause the incoming change to be invisible optimistically,
+			// or if this subdirectory has been disposed or is no longer reachable from root
 			if (
+				!this.disposed &&
+				this.directory.getWorkingDirectory(this.absolutePath) !== undefined &&
 				!this.pendingStorageData.some(
 					(entry) => entry.type === "clear" || entry.key === op.key,
 				)
@@ -2030,8 +2041,11 @@ class SubDirectory extends TypedEventEmitter<IDirectoryEvents> implements IDirec
 			const previousValue: unknown = this.sequencedStorageData.get(key);
 			this.sequencedStorageData.set(key, value);
 
-			// Suppress the event if local changes would cause the incoming change to be invisible optimistically.
+			// Suppress the event if local changes would cause the incoming change to be invisible optimistically,
+			// or if this subdirectory has been disposed or is no longer reachable from root
 			if (
+				!this.disposed &&
+				this.directory.getWorkingDirectory(this.absolutePath) !== undefined &&
 				!this.pendingStorageData.some((entry) => entry.type === "clear" || entry.key === key)
 			) {
 				const event: IDirectoryValueChanged = { key, path: this.absolutePath, previousValue };
