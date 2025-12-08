@@ -175,15 +175,12 @@ export class SharedDirectoryOracle {
 		const dirNode = this.createDirNode(this.modelFromValueChanged, absPath);
 		const oracleValue = dirNode.keys.get(key);
 
-		// Validate previousValue for local events only
-		// Remote events are skipped due to complexity of pending ops and post-clear scenarios
-		if (local) {
-			assert.deepStrictEqual(
-				previousValue,
-				oracleValue,
-				`[valueChanged local] previousValue mismatch for key "${key}" in directory "${path}": event.previousValue=${previousValue}, oracle=${oracleValue}`,
-			);
-		}
+		// Validate previousValue for both local and remote events
+		assert.deepStrictEqual(
+			previousValue,
+			oracleValue,
+			`[valueChanged ${local ? "local" : "remote"}] previousValue mismatch for key "${key}" in directory "${path}": event.previousValue=${previousValue}, oracle=${oracleValue}`,
+		);
 
 		if (fuzzDir.has(key)) {
 			// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
@@ -246,15 +243,13 @@ export class SharedDirectoryOracle {
 
 		const dirNode = this.createDirNode(this.modelFromContainedValueChanged, absolutePath);
 
-		// Validate previousValue matches oracle for local events
-		if (local) {
-			const oracleValue = dirNode.keys.get(key);
-			assert.deepStrictEqual(
-				previousValue,
-				oracleValue,
-				`[containedValueChanged local] previousValue mismatch for key "${key}" in directory "${absolutePath}": event.previousValue=${previousValue}, oracle=${oracleValue}`,
-			);
-		}
+		// Validate previousValue matches oracle for both local and remote events
+		const oracleValue = dirNode.keys.get(key);
+		assert.deepStrictEqual(
+			previousValue,
+			oracleValue,
+			`[containedValueChanged ${local ? "local" : "remote"}] previousValue mismatch for key "${key}" in directory "${absolutePath}": event.previousValue=${previousValue}, oracle=${oracleValue}`,
+		);
 
 		// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 		const newValue = target.get(key);

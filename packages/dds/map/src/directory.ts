@@ -1895,12 +1895,13 @@ class SubDirectory extends TypedEventEmitter<IDirectoryEvents> implements IDirec
 				0xc04 /* Got a local clear message we weren't expecting */,
 			);
 		} else {
-			// For pending set operations, collect the previous values before clearing sequenced data
+			// For pending set operations, collect them to emit events after clearing sequenced data
 			const pendingSets: { key: string; previousValue: unknown }[] = [];
 			for (const entry of this.pendingStorageData) {
 				if (entry.type === "lifetime") {
-					const previousValue = this.sequencedStorageData.get(entry.key);
-					pendingSets.push({ key: entry.key, previousValue });
+					// previousValue should be undefined since the remote clear cleared everything
+					// and the pending set is applied on top of the cleared state
+					pendingSets.push({ key: entry.key, previousValue: undefined });
 				}
 			}
 			this.sequencedStorageData.clear();
@@ -1914,7 +1915,13 @@ class SubDirectory extends TypedEventEmitter<IDirectoryEvents> implements IDirec
 
 			// For pending set operations, emit valueChanged and containedValueChanged events
 			// Include 'path' so listeners can identify which subdirectory the change occurred in
-			// Only emit if this subdirectory hasn't been disposed and is still reachable from root
+			// Only emit if this subdirectory hasn't been disposed and is still reachable from root.
+			//
+			// The getWorkingDirectory check is necessary to suppress events when there's a pending
+			// local delete of this subdirectory (or any ancestor). While the subdirectory is still in
+			// _sequencedSubdirectories (so ops can be routed to it), getWorkingDirectory returns
+			// undefined because getOptimisticSubDirectory sees the pending delete. This ensures
+			// events aren't emitted for subdirectories the user has optimistically deleted.
 			if (
 				!this.disposed &&
 				this.directory.getWorkingDirectory(this.absolutePath) !== undefined
@@ -1974,7 +1981,13 @@ class SubDirectory extends TypedEventEmitter<IDirectoryEvents> implements IDirec
 			const previousValue: unknown = this.sequencedStorageData.get(op.key);
 			this.sequencedStorageData.delete(op.key);
 			// Suppress the event if local changes would cause the incoming change to be invisible optimistically,
-			// or if this subdirectory has been disposed or is no longer reachable from root
+			// or if this subdirectory has been disposed or is no longer reachable from root.
+			//
+			// The getWorkingDirectory check is necessary to suppress events when there's a pending
+			// local delete of this subdirectory (or any ancestor). While the subdirectory is still in
+			// _sequencedSubdirectories (so ops can be routed to it), getWorkingDirectory returns
+			// undefined because getOptimisticSubDirectory sees the pending delete. This ensures
+			// events aren't emitted for subdirectories the user has optimistically deleted.
 			if (
 				!this.disposed &&
 				this.directory.getWorkingDirectory(this.absolutePath) !== undefined &&
@@ -2042,7 +2055,13 @@ class SubDirectory extends TypedEventEmitter<IDirectoryEvents> implements IDirec
 			this.sequencedStorageData.set(key, value);
 
 			// Suppress the event if local changes would cause the incoming change to be invisible optimistically,
-			// or if this subdirectory has been disposed or is no longer reachable from root
+			// or if this subdirectory has been disposed or is no longer reachable from root.
+			//
+			// The getWorkingDirectory check is necessary to suppress events when there's a pending
+			// local delete of this subdirectory (or any ancestor). While the subdirectory is still in
+			// _sequencedSubdirectories (so ops can be routed to it), getWorkingDirectory returns
+			// undefined because getOptimisticSubDirectory sees the pending delete. This ensures
+			// events aren't emitted for subdirectories the user has optimistically deleted.
 			if (
 				!this.disposed &&
 				this.directory.getWorkingDirectory(this.absolutePath) !== undefined &&
