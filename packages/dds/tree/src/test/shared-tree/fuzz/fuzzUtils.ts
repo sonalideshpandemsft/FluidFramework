@@ -48,6 +48,14 @@ import type {
 import { FormatValidatorBasic } from "../../../external-utilities/index.js";
 import type { FuzzView } from "./fuzzEditGenerators.js";
 import type { ISharedTree } from "../../../treeFactory.js";
+import {
+	SharedTreeOracle,
+	hasSharedTreeOracle,
+	type ISharedTreeWithOracle,
+	TreeViewOracle,
+	hasTreeViewOracle,
+	type ITreeViewWithOracle,
+} from "./treeOracle.js";
 
 const builder = new SchemaFactory("treeFuzz");
 export class GUIDNode extends builder.object("GuidNode" as string, {
@@ -293,3 +301,13 @@ export const populatedInitialState: NodeBuilderData<typeof FuzzNode> = {
 	requiredChild: "R",
 	optionalChild: undefined,
 } as unknown as NodeBuilderData<typeof FuzzNode>;
+
+// Re-export oracle utilities for use in fuzz tests
+export {
+	SharedTreeOracle,
+	hasSharedTreeOracle,
+	type ISharedTreeWithOracle,
+	TreeViewOracle,
+	hasTreeViewOracle,
+	type ITreeViewWithOracle,
+};
