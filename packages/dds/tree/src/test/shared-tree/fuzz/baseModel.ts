@@ -4,9 +4,14 @@
  */
 
 import type { DDSFuzzModel, DDSFuzzTestState } from "@fluid-private/test-dds-utils";
+import type { Client } from "@fluid-private/test-dds-utils";
 import { validateFuzzTreeConsistency } from "../../utils.js";
 import { fuzzReducer } from "./fuzzEditReducers.js";
-import { SharedTreeFuzzTestFactory, createOnCreate } from "./fuzzUtils.js";
+import {
+	SharedTreeFuzzTestFactory,
+	createOnCreate,
+	hasSharedTreeOracle,
+} from "./fuzzUtils.js";
 import type { Operation } from "./operationTypes.js";
 import { takeAsync } from "@fluid-private/stochastic-test-utils";
 import { type EditGeneratorOpWeights, makeOpGenerator } from "./fuzzEditGenerators.js";
@@ -34,6 +39,26 @@ const editGeneratorOpWeights: Partial<EditGeneratorOpWeights> = {
 };
 const generatorFactory = () => takeAsync(100, makeOpGenerator(editGeneratorOpWeights));
 
+/**
+ * Validates consistency between two trees, including oracle validation if present
+ */
+function validateTreeConsistencyWithOracles(
+	treeA: Client<SharedTreeFuzzTestFactory>,
+	treeB: Client<SharedTreeFuzzTestFactory>,
+): void {
+	// Validate oracles if they exist
+	if (hasSharedTreeOracle(treeA.channel)) {
+		treeA.channel.sharedTreeOracle?.validate();
+	}
+
+	if (hasSharedTreeOracle(treeB.channel)) {
+		treeB.channel.sharedTreeOracle?.validate();
+	}
+
+	// Perform standard tree consistency validation
+	validateFuzzTreeConsistency(treeA, treeB);
+}
+
 export const baseTreeModel: DDSFuzzModel<
 	SharedTreeFuzzTestFactory,
 	Operation,
@@ -46,7 +71,7 @@ export const baseTreeModel: DDSFuzzModel<
 	}),
 	generatorFactory,
 	reducer: fuzzReducer,
-	validateConsistency: validateFuzzTreeConsistency,
+	validateConsistency: validateTreeConsistencyWithOracles,
 };
 
 export const optimizedForestTreeModel: DDSFuzzModel<
@@ -61,5 +86,5 @@ export const optimizedForestTreeModel: DDSFuzzModel<
 	}),
 	generatorFactory,
 	reducer: fuzzReducer,
-	validateConsistency: validateFuzzTreeConsistency,
+	validateConsistency: validateTreeConsistencyWithOracles,
 };

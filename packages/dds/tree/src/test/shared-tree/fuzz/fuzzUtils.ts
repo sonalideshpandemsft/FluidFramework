@@ -48,6 +48,7 @@ import type {
 import { FormatValidatorBasic } from "../../../external-utilities/index.js";
 import type { FuzzView } from "./fuzzEditGenerators.js";
 import type { ISharedTree } from "../../../treeFactory.js";
+import { SharedTreeOracle } from "./treeOracle.js";
 
 const builder = new SchemaFactory("treeFuzz");
 export class GUIDNode extends builder.object("GuidNode" as string, {
@@ -293,3 +294,34 @@ export const populatedInitialState: NodeBuilderData<typeof FuzzNode> = {
 	requiredChild: "R",
 	optionalChild: undefined,
 } as unknown as NodeBuilderData<typeof FuzzNode>;
+
+/**
+ * Interface for SharedTree with oracle for fuzz testing
+ * @internal
+ */
+export interface ISharedTreeWithOracle extends ISharedTree {
+	/**
+	 * Oracle for validating nodeChanged events
+	 */
+	sharedTreeOracle?: SharedTreeOracle;
+}
+
+/**
+ * Type guard to check if a SharedTree has an oracle attached
+ * @internal
+ */
+export function hasSharedTreeOracle(tree: ISharedTree): tree is ISharedTreeWithOracle {
+	return (tree as ISharedTreeWithOracle).sharedTreeOracle !== undefined;
+}
+
+/**
+ * Attaches a SharedTreeOracle to a SharedTree for event validation in fuzz tests
+ * @internal
+ */
+export function attachTreeOracle(tree: ISharedTree): void {
+	const treeWithOracle = tree as ISharedTreeWithOracle;
+	treeWithOracle.sharedTreeOracle = new SharedTreeOracle(
+		tree,
+		new TreeViewConfiguration({ schema: initialFuzzSchema }),
+	);
+}
