@@ -166,17 +166,12 @@ export class SharedDirectoryOracle {
 		const absPath = path.startsWith("/") ? path : `/${path}`;
 		const dirNode = this.createDirNode(this.modelFromValueChanged, absPath);
 
-		// Validate previousValue matches oracle, except:
-		// - Post-clear events: previousValue from before clear, oracle already cleared
-		// - Remote ops with pending local ops: oracle has optimistic value, event has sequenced value
-		const oracleValue = dirNode.keys.get(key);
-		const isPostClearEvent = previousValue !== undefined && oracleValue === undefined;
-		const hasPendingLocalOp = !local && oracleValue !== previousValue;
-		if (!isPostClearEvent && !hasPendingLocalOp) {
+		// Validate previousValue matches oracle (skip for post-clear pending ops)
+		if (local) {
 			assert.deepStrictEqual(
 				previousValue,
-				oracleValue,
-				`[valueChanged] previousValue mismatch for key "${key}" in directory "${path}": event.previousValue=${previousValue}, oracle=${oracleValue}, local=${local}`,
+				dirNode.keys.get(key),
+				`[valueChanged] previousValue mismatch for key "${key}" in directory "${path}": event.previousValue=${previousValue}, oracle=${dirNode.keys.get(key)}, local=${local}`,
 			);
 		}
 
@@ -241,13 +236,13 @@ export class SharedDirectoryOracle {
 
 		const dirNode = this.createDirNode(this.modelFromContainedValueChanged, absolutePath);
 
-		// Validate previousValue matches oracle, except:
-		// - Post-clear events: previousValue from before clear, oracle already cleared
-		// - Remote ops with pending local ops: oracle has optimistic value, event has sequenced value
 		const oracleValue = dirNode.keys.get(key);
+		// Post-clear events: previousValue from before clear, oracle already cleared
+
 		const isPostClearEvent = previousValue !== undefined && oracleValue === undefined;
-		const hasPendingLocalOp = !local && oracleValue !== previousValue;
-		if (!isPostClearEvent && !hasPendingLocalOp) {
+
+		// Validate previousValue matches oracle (skip for post-clear pending ops)
+		if (local && !isPostClearEvent) {
 			assert.deepStrictEqual(
 				previousValue,
 				oracleValue,
