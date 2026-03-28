@@ -3630,7 +3630,7 @@ export class ContainerRuntime
 		return result;
 	}
 
-	private stageControls: boolean = false;
+	private _inStagingMode: boolean = false;
 
 	/**
 	 * If true, the ContainerRuntime is not submitting any new ops to the ordering service.
@@ -3638,7 +3638,7 @@ export class ContainerRuntime
 	 * either to be discarded or committed later (via exitStagingMode).
 	 */
 	public get inStagingMode(): boolean {
-		return this.stageControls;
+		return this._inStagingMode;
 	}
 
 	/**
@@ -3657,7 +3657,7 @@ export class ContainerRuntime
 		// since we mark whole batches as "staged" or not to indicate whether to submit them.
 		this.flush();
 
-		this.stageControls = true;
+		this._inStagingMode = true;
 		this.channelCollection.notifyStagingMode(true);
 	};
 
@@ -3672,7 +3672,7 @@ export class ContainerRuntime
 		action: "commit" | "discard",
 		options?: Partial<CommitStagedChangesOptionsInternal>,
 	): void => {
-		if (!this.stageControls) {
+		if (!this._inStagingMode) {
 			throw new UsageError("Not in staging mode");
 		}
 
@@ -3705,7 +3705,7 @@ export class ContainerRuntime
 					// NOTE: We can't use this.flush() here, because orderSequentially uses StagingMode and in the rollback case we'll hit assert 0x24c
 					this.outbox.flush();
 
-					this.stageControls = false;
+					this._inStagingMode = false;
 
 					// During Staging Mode, we avoid submitting any ID Allocation ops (apart from resubmitting pre-staging ops).
 					// Now that we've exited, we need to submit an ID Allocation op for any IDs that were generated while in Staging Mode.
