@@ -26,7 +26,7 @@ import type { IChannel } from "@fluidframework/datastore-definitions/internal";
 // Valid export as per package.json export map
 import { modifyClusterSize } from "@fluidframework/id-compressor/internal/test-utils";
 import { ISharedMap, SharedMap } from "@fluidframework/map/internal";
-import type { StageControlsAlpha } from "@fluidframework/runtime-definitions/internal";
+import type { IContainerRuntimeBaseInternal } from "@fluidframework/runtime-definitions/internal";
 import {
 	RuntimeHeaders,
 	toFluidHandleInternal,
@@ -335,14 +335,11 @@ export class DefaultStressDataObject extends StressDataObject {
 		this._locallyCreatedObjects.push(obj);
 	}
 
-	private stageControls: StageControlsAlpha | undefined;
+	private readonly containerRuntimeInternal = this.context
+		.containerRuntime as unknown as IContainerRuntimeBaseInternal;
 	private readonly containerRuntimeExp = asLegacyAlpha(this.context.containerRuntime);
 	public enterStagingMode(): void {
-		assert(
-			this.containerRuntimeExp.enterStagingMode !== undefined,
-			"enterStagingMode must be defined",
-		);
-		this.stageControls = this.containerRuntimeExp.enterStagingMode();
+		this.containerRuntimeInternal.enterStagingMode();
 	}
 
 	public inStagingMode(): boolean {
@@ -354,13 +351,11 @@ export class DefaultStressDataObject extends StressDataObject {
 	}
 
 	public exitStagingMode(commit: boolean): void {
-		assert(this.stageControls !== undefined, "must have staging mode controls");
 		if (commit) {
-			this.stageControls.commitChanges();
+			this.containerRuntimeInternal.exitStagingMode("commit");
 		} else {
-			this.stageControls.discardChanges();
+			this.containerRuntimeInternal.exitStagingMode("discard");
 		}
-		this.stageControls = undefined;
 
 		// Flush any pending containerObjectMap registrations that were deferred during staging mode.
 		// This happens after staging mode exits so the writes won't be rolled back.
@@ -397,7 +392,7 @@ export const createRuntimeFactory = (): IRuntimeFactory => {
 			return this;
 		},
 		instantiateRuntime: async (context, existing) => {
-			const runtime = await loadContainerRuntime({
+			const { runtime } = await loadContainerRuntime({
 				context,
 				existing,
 				runtimeOptions,

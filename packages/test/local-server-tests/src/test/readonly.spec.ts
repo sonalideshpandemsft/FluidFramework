@@ -90,7 +90,7 @@ const runtimeFactory: IRuntimeFactory = {
 		return this;
 	},
 	instantiateRuntime: async (context, existing) => {
-		return loadContainerRuntime({
+		const { runtime } = await loadContainerRuntime({
 			context,
 			existing,
 			registryEntries: [
@@ -112,6 +112,7 @@ const runtimeFactory: IRuntimeFactory = {
 				return root.get();
 			},
 		});
+		return runtime;
 	},
 };
 

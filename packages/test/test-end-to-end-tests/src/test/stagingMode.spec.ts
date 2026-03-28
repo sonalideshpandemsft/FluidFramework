@@ -13,6 +13,7 @@ import type { ISharedDirectory } from "@fluidframework/map/internal";
 import {
 	asLegacyAlpha,
 	type ContainerRuntimeBaseAlpha,
+	type IContainerRuntimeBaseInternal,
 	type IFluidDataStoreChannel,
 	type IFluidDataStoreContext,
 	type IFluidDataStorePolicies,
@@ -36,6 +37,7 @@ describeCompat(
 		}): Promise<{
 			container: IContainer;
 			containerRuntime: ContainerRuntimeBaseAlpha;
+			containerRuntimeInternal: IContainerRuntimeBaseInternal;
 			dsRuntime: IFluidDataStoreChannel & IFluidDataStoreRuntime;
 			shareDir: ISharedDirectory;
 		}> => {
@@ -82,16 +84,19 @@ describeCompat(
 				await getContainerEntryPointBackCompat<ITestDataObject>(container);
 
 			const containerRuntime = asLegacyAlpha(_context.containerRuntime);
+			const containerRuntimeInternal =
+				_context.containerRuntime as IContainerRuntimeBaseInternal;
 			return {
 				container,
 				containerRuntime,
+				containerRuntimeInternal,
 				dsRuntime: _runtime as unknown as IFluidDataStoreChannel & IFluidDataStoreRuntime,
 				shareDir: _root,
 			};
 		};
 
 		it(`should set runtime to readonly when readonlyInStagingMode: true`, async function () {
-			const { containerRuntime, dsRuntime } = await createContainer({
+			const { containerRuntimeInternal, dsRuntime } = await createContainer({
 				test: this,
 				readonlyInStagingMode: true,
 			});
@@ -102,7 +107,7 @@ describeCompat(
 				"Runtime should not be readonly before entering staging mode.",
 			);
 
-			const controls = containerRuntime.enterStagingMode?.();
+			containerRuntimeInternal.enterStagingMode();
 
 			assert.equal(
 				dsRuntime.isReadOnly(),
@@ -110,7 +115,7 @@ describeCompat(
 				"Runtime should be readonly after entering staging mode.",
 			);
 
-			controls?.commitChanges();
+			containerRuntimeInternal.exitStagingMode("commit");
 
 			assert.equal(
 				dsRuntime.isReadOnly(),
@@ -120,7 +125,7 @@ describeCompat(
 		});
 
 		it(`should preserve readonly state when set before entering staging mode with readonlyInStagingMode: true`, async function () {
-			const { container, containerRuntime, dsRuntime } = await createContainer({
+			const { container, containerRuntimeInternal, dsRuntime } = await createContainer({
 				test: this,
 				readonlyInStagingMode: true,
 			});
@@ -133,7 +138,7 @@ describeCompat(
 				"Runtime should preserve readonly state set before entering staging mode.",
 			);
 
-			const controls = containerRuntime.enterStagingMode?.();
+			containerRuntimeInternal.enterStagingMode();
 
 			assert.equal(
 				dsRuntime.isReadOnly(),
@@ -141,7 +146,7 @@ describeCompat(
 				"Runtime should be readonly after entering staging mode.",
 			);
 
-			controls?.commitChanges();
+			containerRuntimeInternal.exitStagingMode("commit");
 
 			assert.equal(
 				dsRuntime.isReadOnly(),
@@ -151,7 +156,7 @@ describeCompat(
 		});
 
 		it(`should preserve readonly state when set during staging mode with readonlyInStagingMode: true`, async function () {
-			const { container, containerRuntime, dsRuntime } = await createContainer({
+			const { container, containerRuntimeInternal, dsRuntime } = await createContainer({
 				test: this,
 				readonlyInStagingMode: true,
 			});
@@ -162,7 +167,7 @@ describeCompat(
 				"Runtime should not be readonly before entering staging mode.",
 			);
 
-			const controls = containerRuntime.enterStagingMode?.();
+			containerRuntimeInternal.enterStagingMode();
 
 			container.forceReadonly?.(true);
 
@@ -172,7 +177,7 @@ describeCompat(
 				"Runtime should preserve readonly state set during staging mode.",
 			);
 
-			controls?.commitChanges();
+			containerRuntimeInternal.exitStagingMode("commit");
 
 			assert.equal(
 				dsRuntime.isReadOnly(),
@@ -182,7 +187,7 @@ describeCompat(
 		});
 
 		it("should not set runtime to readonly when readonlyInStagingMode: false", async function () {
-			const { containerRuntime, dsRuntime } = await createContainer({
+			const { containerRuntimeInternal, dsRuntime } = await createContainer({
 				test: this,
 				readonlyInStagingMode: false,
 			});
@@ -193,7 +198,7 @@ describeCompat(
 				"Runtime should not be readonly before entering staging mode.",
 			);
 
-			const controls = containerRuntime.enterStagingMode?.();
+			containerRuntimeInternal.enterStagingMode();
 
 			assert.equal(
 				dsRuntime.isReadOnly(),
@@ -201,7 +206,7 @@ describeCompat(
 				"Runtime should not be readonly when readonlyInStagingMode is false.",
 			);
 
-			controls?.commitChanges();
+			containerRuntimeInternal.exitStagingMode("commit");
 
 			assert.equal(
 				dsRuntime.isReadOnly(),
@@ -211,16 +216,16 @@ describeCompat(
 		});
 
 		it("should allow changes readonlyInStagingMode: false", async function () {
-			const { container, containerRuntime, shareDir } = await createContainer({
+			const { container, containerRuntimeInternal, shareDir } = await createContainer({
 				test: this,
 				readonlyInStagingMode: false,
 			});
 
-			const controls = containerRuntime.enterStagingMode?.();
+			containerRuntimeInternal.enterStagingMode();
 
 			shareDir.set("test", "test");
 
-			controls?.commitChanges();
+			containerRuntimeInternal.exitStagingMode("commit");
 
 			if (container.isDirty) {
 				await timeoutPromise((resolve) => {
@@ -238,16 +243,16 @@ describeCompat(
 				},
 			],
 			async function () {
-				const { container, containerRuntime, shareDir } = await createContainer({
+				const { container, containerRuntimeInternal, shareDir } = await createContainer({
 					test: this,
 					readonlyInStagingMode: true,
 				});
 
-				const controls = containerRuntime.enterStagingMode?.();
+				containerRuntimeInternal.enterStagingMode();
 
 				shareDir.set("test", "test");
 
-				controls?.commitChanges();
+				containerRuntimeInternal.exitStagingMode("commit");
 
 				if (container.isDirty) {
 					await timeoutPromise((resolve) => {

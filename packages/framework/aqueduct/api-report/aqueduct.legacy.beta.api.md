@@ -13,6 +13,7 @@ export class BaseContainerRuntimeFactory extends RuntimeFactoryHelper implements
     instantiateFirstTime(runtime: IContainerRuntime): Promise<void>;
     instantiateFromExisting(runtime: IContainerRuntime): Promise<void>;
     preInitialize(context: IContainerContext, existing: boolean): Promise<IContainerRuntime & IRuntime>;
+    stagingController: IStagingController | undefined;
 }
 
 // @beta @legacy @input

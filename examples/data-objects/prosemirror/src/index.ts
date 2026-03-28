@@ -38,7 +38,7 @@ class ProseMirrorRuntimeFactory extends RuntimeFactoryHelper {
 			[smde.type, Promise.resolve(smde)],
 		]);
 
-		const runtime = await loadContainerRuntime({
+		const { runtime } = await loadContainerRuntime({
 			context,
 			registryEntries,
 			existing,

@@ -163,7 +163,7 @@ export class ContainerRuntimeFactoryWithDefaultDataStore
 		context: IContainerContext,
 		existing: boolean,
 	): Promise<IContainerRuntime & IRuntime> {
-		return loadContainerRuntime({
+		const { runtime } = await loadContainerRuntime({
 			context,
 			existing,
 			runtimeOptions: this.runtimeOptions,
@@ -174,6 +174,7 @@ export class ContainerRuntimeFactoryWithDefaultDataStore
 			provideEntryPoint: this.provideEntryPoint,
 			minVersionForCollab: this.minVersionForCollab,
 		});
+		return runtime;
 	}
 
 	/**

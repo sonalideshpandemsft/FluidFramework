@@ -339,7 +339,10 @@ export interface IUploadSummaryResult extends Omit<IGenerateSummaryTreeResult, "
 }
 
 // @beta @legacy
-export function loadContainerRuntime(params: LoadContainerRuntimeParams): Promise<IContainerRuntime & IRuntime>;
+export function loadContainerRuntime(params: LoadContainerRuntimeParams): Promise<{
+    runtime: IContainerRuntime & IRuntime;
+    stagingController: IStagingController;
+}>;
 
 // @beta @legacy
 export interface LoadContainerRuntimeParams {

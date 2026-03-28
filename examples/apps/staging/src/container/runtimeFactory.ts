@@ -40,7 +40,7 @@ export class GroceryListContainerRuntimeFactory implements IRuntimeFactory {
 			return new SuggestionGroceryList(groceryList);
 		};
 
-		const runtime = await loadContainerRuntime({
+		const { runtime } = await loadContainerRuntime({
 			context,
 			registryEntries: new Map([
 				[groceryListRegistryKey, Promise.resolve(groceryListFactory)],

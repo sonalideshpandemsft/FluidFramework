@@ -24,6 +24,7 @@ declare type MakeUnusedImportErrorsGoAway<T> = TypeOnly<T> | MinimalType<T> | Fu
  * typeValidation.broken:
  * "Class_BaseContainerRuntimeFactory": {"forwardCompat": false}
  */
+// @ts-expect-error compatibility expected to be broken
 declare type old_as_current_for_Class_BaseContainerRuntimeFactory = requireAssignableTo<TypeOnly<old.BaseContainerRuntimeFactory>, TypeOnly<current.BaseContainerRuntimeFactory>>
 
 /*
@@ -42,6 +43,7 @@ declare type current_as_old_for_Class_BaseContainerRuntimeFactory = requireAssig
  * typeValidation.broken:
  * "Class_ContainerRuntimeFactoryWithDefaultDataStore": {"forwardCompat": false}
  */
+// @ts-expect-error compatibility expected to be broken
 declare type old_as_current_for_Class_ContainerRuntimeFactoryWithDefaultDataStore = requireAssignableTo<TypeOnly<old.ContainerRuntimeFactoryWithDefaultDataStore>, TypeOnly<current.ContainerRuntimeFactoryWithDefaultDataStore>>
 
 /*

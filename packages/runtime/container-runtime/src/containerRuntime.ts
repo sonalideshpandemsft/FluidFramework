@@ -126,11 +126,11 @@ import type {
 	IInboundSignalMessage,
 	IRuntimeMessagesContent,
 	ISummarizerNodeWithGC,
-	StageControlsInternal,
 	IContainerRuntimeBaseInternal,
 	MinimumVersionForCollab,
 	ContainerExtensionExpectations,
-	ContainerRuntimeBaseAlpha,
+	IStagingController,
+	CommitStagedChangesOptionsInternal,
 } from "@fluidframework/runtime-definitions/internal";
 import {
 	addBlobToSummary,
@@ -268,6 +268,7 @@ import {
 	validateLoaderCompatibility,
 } from "./runtimeLayerCompatState.js";
 import { SignalTelemetryManager } from "./signalTelemetryProcessing.js";
+import { StagingController } from "./stagingController.js";
 // These types are imported as types here because they are present in summaryDelayLoadedModule, which is loaded dynamically when required.
 import {
 	aliasBlobName,
@@ -826,31 +827,18 @@ export interface LoadContainerRuntimeParams {
 /**
  * This is meant to be used by a {@link @fluidframework/container-definitions#IRuntimeFactory} to instantiate a container runtime.
  * @param params - An object which specifies all required and optional params necessary to instantiate a runtime.
- * @returns A runtime which provides all the functionality necessary to bind with the loader layer via the {@link @fluidframework/container-definitions#IRuntime} interface and provide a runtime environment via the {@link @fluidframework/container-runtime-definitions#IContainerRuntime} interface.
+ * @returns An object containing the runtime and a staging controller.
  * @legacy @beta
  */
-export async function loadContainerRuntime(
-	params: LoadContainerRuntimeParams,
-): Promise<IContainerRuntime & IRuntime> {
-	return ContainerRuntime.loadRuntime(params);
-}
-
-/**
- * Alpha variant of {@link loadContainerRuntime} that returns the runtime in an
- * extendable object, allowing additional properties to be added in the future.
- *
- * @param params - An object which specifies all required and optional params necessary to instantiate a runtime.
- * @returns An object containing the runtime.
- *
- * @legacy @alpha
- */
-export async function loadContainerRuntimeAlpha(params: LoadContainerRuntimeParams): Promise<{
-	runtime: IContainerRuntime & ContainerRuntimeBaseAlpha & IRuntime;
+export async function loadContainerRuntime(params: LoadContainerRuntimeParams): Promise<{
+	runtime: IContainerRuntime & IRuntime;
+	stagingController: IStagingController;
 }> {
-	return ContainerRuntime.loadRuntime2({
+	const { runtime, stagingController } = await ContainerRuntime.loadRuntime2({
 		...params,
 		registry: new FluidDataStoreRegistry(params.registryEntries),
 	});
+	return { runtime, stagingController };
 }
 
 const defaultMaxConsecutiveReconnects = 7;
@@ -955,7 +943,7 @@ export class ContainerRuntime
 			 */
 			runtimeOptions?: IContainerRuntimeOptionsInternal;
 		},
-	): Promise<{ runtime: ContainerRuntime }> {
+	): Promise<{ runtime: ContainerRuntime; stagingController: IStagingController }> {
 		const {
 			context,
 			registry,
@@ -1306,7 +1294,8 @@ export class ContainerRuntime
 		// or zero. This must be done before Container replays saved ops.
 		await runtime.pendingStateManager.applyStashedOpsAt(runtimeSequenceNumber ?? 0);
 
-		return { runtime };
+		const stagingController = new StagingController(runtime);
+		return { runtime, stagingController };
 	}
 
 	public readonly options: Record<string | number, unknown>;
@@ -3572,10 +3561,11 @@ export class ContainerRuntime
 	 */
 	public orderSequentially<T>(callback: () => T): T {
 		let checkpoint: IBatchCheckpoint | undefined;
-		let stageControls: StageControlsInternal | undefined;
+		let enteredStagingMode = false;
 		if (this.mc.config.getBoolean("Fluid.ContainerRuntime.EnableRollback") === true) {
 			if (!this.batchRunner.running && !this.inStagingMode) {
-				stageControls = this.enterStagingMode();
+				this.enterStagingMode();
+				enteredStagingMode = true;
 			}
 			// Note: we are not touching any batches other than mainBatch here, for two reasons:
 			// 1. It would not help, as other batches are flushed independently from main batch.
@@ -3594,8 +3584,10 @@ export class ContainerRuntime
 							this.rollbackStagedChange(message.runtimeOp, message.localOpMetadata),
 						);
 						this.updateDocumentDirtyState();
-						stageControls?.discardChanges();
-						stageControls = undefined;
+						if (enteredStagingMode) {
+							this.exitStagingMode("discard");
+							enteredStagingMode = false;
+						}
 					} catch (error_) {
 						const error2 = wrapError(error_, (message) => {
 							return DataProcessingError.create(
@@ -3627,7 +3619,9 @@ export class ContainerRuntime
 			}
 		});
 
-		stageControls?.commitChanges({ squash: false });
+		if (enteredStagingMode) {
+			this.exitStagingMode("commit", { squash: false });
+		}
 
 		// We don't flush on TurnBased since we expect all messages in the same JS turn to be part of the same batch
 		if (this.flushMode !== FlushMode.TurnBased && !this.batchRunner.running) {
@@ -3636,25 +3630,23 @@ export class ContainerRuntime
 		return result;
 	}
 
-	private stageControls: StageControlsInternal | undefined;
+	private stageControls: boolean = false;
 
 	/**
 	 * If true, the ContainerRuntime is not submitting any new ops to the ordering service.
 	 * Ops submitted to the ContainerRuntime while in Staging Mode will be queued in the PendingStateManager,
-	 * either to be discarded or committed later (via the Stage Controls returned from enterStagingMode).
+	 * either to be discarded or committed later (via exitStagingMode).
 	 */
 	public get inStagingMode(): boolean {
-		return this.stageControls !== undefined;
+		return this.stageControls;
 	}
 
 	/**
 	 * Enter Staging Mode, such that ops submitted to the ContainerRuntime will not be sent to the ordering service.
-	 * To exit Staging Mode, call either discardChanges or commitChanges on the Stage Controls returned from this method.
-	 *
-	 * @returns Controls for exiting Staging Mode.
+	 * To exit Staging Mode, call exitStagingMode with "commit" or "discard".
 	 */
-	public enterStagingMode = (): StageControlsInternal => {
-		if (this.stageControls !== undefined) {
+	public enterStagingMode = (): void => {
+		if (this.inStagingMode) {
 			throw new UsageError("Already in staging mode");
 		}
 		if (this.attachState === AttachState.Detached) {
@@ -3665,75 +3657,77 @@ export class ContainerRuntime
 		// since we mark whole batches as "staged" or not to indicate whether to submit them.
 		this.flush();
 
-		const exitStagingMode = (
-			discardOrCommit: () => IPendingMessage["batchInfo"][],
-			exitMethod: "commit" | "discard",
-		): void => {
-			try {
-				PerformanceEvent.timedExec(
-					this.mc.logger,
-					{
-						eventName: `ExitStagingMode_${exitMethod}`,
-					},
-					(event) => {
-						// Final flush of any last staged changes
-						// NOTE: We can't use this.flush() here, because orderSequentially uses StagingMode and in the rollback case we'll hit assert 0x24c
-						this.outbox.flush();
+		this.stageControls = true;
+		this.channelCollection.notifyStagingMode(true);
+	};
 
-						this.stageControls = undefined;
+	/**
+	 * Exit Staging Mode, either committing or discarding the staged changes.
+	 *
+	 * @param action - `"commit"` sends the buffered ops to the ordering service.
+	 * `"discard"` rolls back all changes made while in staging mode.
+	 * @param options - Options for the exit action (only applicable to `"commit"`).
+	 */
+	public exitStagingMode = (
+		action: "commit" | "discard",
+		options?: Partial<CommitStagedChangesOptionsInternal>,
+	): void => {
+		if (!this.stageControls) {
+			throw new UsageError("Not in staging mode");
+		}
 
-						// During Staging Mode, we avoid submitting any ID Allocation ops (apart from resubmitting pre-staging ops).
-						// Now that we've exited, we need to submit an ID Allocation op for any IDs that were generated while in Staging Mode.
-						this.submitIdAllocationOpIfNeeded({ staged: false });
-						const batchInfos = discardOrCommit();
-						event.reportProgress({
-							details: {
-								autoFlushThreshold: this.stagingModeAutoFlushThreshold,
-								batches: batchInfos.length,
-								batchesAtOrOverThreshold: batchInfos.filter(
-									(b) => b.length >= this.stagingModeAutoFlushThreshold,
-								).length,
-							},
-						});
-						this.channelCollection.notifyStagingMode(false);
+		const discardOrCommit = (): IPendingMessage["batchInfo"][] => {
+			if (action === "discard") {
+				const batchInfos = this.pendingStateManager.popStagedBatches(
+					({ runtimeOp, localOpMetadata }) => {
+						this.rollbackStagedChange(runtimeOp, localOpMetadata);
 					},
 				);
-			} catch (error) {
-				const normalizedError = normalizeError(error);
-				this.closeFn(normalizedError);
-				throw normalizedError;
+				this.updateDocumentDirtyState();
+				return batchInfos;
+			} else {
+				const { squash } = { ...defaultStagingCommitOptions, ...options };
+				return this.pendingStateManager.replayPendingStates({
+					committingStagedBatches: true,
+					squash,
+				});
 			}
 		};
 
-		const stageControls: StageControlsInternal = {
-			discardChanges: () =>
-				exitStagingMode(() => {
-					// Pop all staged batches from the PSM and roll them back in LIFO order
-					const batchInfos = this.pendingStateManager.popStagedBatches(
-						({ runtimeOp, localOpMetadata }) => {
-							this.rollbackStagedChange(runtimeOp, localOpMetadata);
+		try {
+			PerformanceEvent.timedExec(
+				this.mc.logger,
+				{
+					eventName: `ExitStagingMode_${action}`,
+				},
+				(event) => {
+					// Final flush of any last staged changes
+					// NOTE: We can't use this.flush() here, because orderSequentially uses StagingMode and in the rollback case we'll hit assert 0x24c
+					this.outbox.flush();
+
+					this.stageControls = false;
+
+					// During Staging Mode, we avoid submitting any ID Allocation ops (apart from resubmitting pre-staging ops).
+					// Now that we've exited, we need to submit an ID Allocation op for any IDs that were generated while in Staging Mode.
+					this.submitIdAllocationOpIfNeeded({ staged: false });
+					const batchInfos = discardOrCommit();
+					event.reportProgress({
+						details: {
+							autoFlushThreshold: this.stagingModeAutoFlushThreshold,
+							batches: batchInfos.length,
+							batchesAtOrOverThreshold: batchInfos.filter(
+								(b) => b.length >= this.stagingModeAutoFlushThreshold,
+							).length,
 						},
-					);
-					this.updateDocumentDirtyState();
-					return batchInfos;
-				}, "discard"),
-			commitChanges: (options) => {
-				const { squash } = { ...defaultStagingCommitOptions, ...options };
-				exitStagingMode(() => {
-					// Replay all staged batches in typical FIFO order.
-					// We'll be out of staging mode so they'll be sent to the service finally.
-					return this.pendingStateManager.replayPendingStates({
-						committingStagedBatches: true,
-						squash,
 					});
-				}, "commit");
-			},
-		};
-
-		this.stageControls = stageControls;
-		this.channelCollection.notifyStagingMode(true);
-
-		return this.stageControls;
+					this.channelCollection.notifyStagingMode(false);
+				},
+			);
+		} catch (error) {
+			const normalizedError = normalizeError(error);
+			this.closeFn(normalizedError);
+			throw normalizedError;
+		}
 	};
 
 	/**

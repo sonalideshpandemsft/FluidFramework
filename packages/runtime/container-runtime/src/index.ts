@@ -10,7 +10,6 @@ export {
 	type IContainerRuntimeOptions,
 	type IContainerRuntimeOptionsInternal,
 	loadContainerRuntime,
-	loadContainerRuntimeAlpha,
 	type LoadContainerRuntimeParams,
 	agentSchedulerId,
 	ContainerRuntime,
@@ -19,6 +18,7 @@ export {
 	InactiveResponseHeaderKey,
 	type RuntimeHeaderData,
 } from "./containerRuntime.js";
+
 export type { ICompressionRuntimeOptions } from "./compressionDefinitions.js";
 export { CompressionAlgorithms, disabledCompressionConfig } from "./compressionDefinitions.js";
 export type {

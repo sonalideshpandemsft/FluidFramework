@@ -155,13 +155,13 @@ describe("Container Runtime", () => {
 			const mockProvideEntryPoint = async (): Promise<{ myProp: string }> => ({
 				myProp: "myValue",
 			});
-			containerRuntime = await loadContainerRuntime({
+			({ runtime: containerRuntime } = await loadContainerRuntime({
 				context: getMockContext(deltaManager) as IContainerContext,
 				registryEntries: [],
 				existing: true,
 				runtimeOptions: {},
 				provideEntryPoint: mockProvideEntryPoint,
-			});
+			}));
 			assert(containerRuntime !== undefined, "Container runtime should be defined");
 
 			containerRuntime.on("batchBegin", () => {

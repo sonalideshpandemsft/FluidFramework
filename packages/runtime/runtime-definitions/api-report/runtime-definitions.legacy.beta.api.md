@@ -295,6 +295,12 @@ export interface IRuntimeStorageService {
 // @beta @legacy
 export type ISequencedMessageEnvelope = Omit<ISequencedDocumentMessage, "contents" | "clientSequenceNumber">;
 
+// @beta @sealed @legacy
+export interface IStagingController {
+    enterStagingMode(): void;
+    exitStagingMode(action: "commit" | "discard"): void;
+}
+
 // @beta @legacy
 export interface ISummarizeInternalResult extends ISummarizeResult {
     // (undocumented)
