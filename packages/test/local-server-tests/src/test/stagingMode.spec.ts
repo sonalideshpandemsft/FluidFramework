@@ -60,7 +60,7 @@ class DataObjectWithStagingMode extends DataObject {
 			: DataObjectWithStagingMode.instanceCount++;
 
 	private readonly containerRuntimeInternal = this.context
-		.containerRuntime as unknown as IContainerRuntimeBaseInternal;
+		.containerRuntime as IContainerRuntimeBaseInternal;
 	get DataObjectWithStagingMode(): this {
 		return this;
 	}

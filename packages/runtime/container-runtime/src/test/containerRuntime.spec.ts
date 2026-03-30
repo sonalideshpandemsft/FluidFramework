@@ -4426,6 +4426,10 @@ describe("Runtime", () => {
 					submittedOps.length = 0;
 
 					runtimeWithThreshold.enterStagingMode();
+					// Submit 5 ops across multiple turns — under the threshold of 10
+					submitDataStoreOp(runtimeWithThreshold, "1", genTestDataStoreMessage("op1"));
+					await Promise.resolve();
+					submitDataStoreOp(runtimeWithThreshold, "2", genTestDataStoreMessage("op2"));
 					await Promise.resolve();
 					submitDataStoreOp(runtimeWithThreshold, "3", genTestDataStoreMessage("op3"));
 					await Promise.resolve();

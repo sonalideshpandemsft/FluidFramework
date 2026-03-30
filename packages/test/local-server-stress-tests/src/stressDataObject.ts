@@ -336,7 +336,7 @@ export class DefaultStressDataObject extends StressDataObject {
 	}
 
 	private readonly containerRuntimeInternal = this.context
-		.containerRuntime as unknown as IContainerRuntimeBaseInternal;
+		.containerRuntime as IContainerRuntimeBaseInternal;
 	private readonly containerRuntimeExp = asLegacyAlpha(this.context.containerRuntime);
 	public enterStagingMode(): void {
 		this.containerRuntimeInternal.enterStagingMode();
