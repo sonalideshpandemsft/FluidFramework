@@ -18,7 +18,6 @@ import {
 	LocalResolver,
 } from "@fluidframework/local-driver/internal";
 import { type ISharedMap, SharedMap } from "@fluidframework/map/internal";
-import type { IContainerRuntimeBaseInternal } from "@fluidframework/runtime-definitions/internal";
 import {
 	ILocalDeltaConnectionServer,
 	LocalDeltaConnectionServer,
@@ -299,7 +298,9 @@ describe("Document Dirty", () => {
 				// Submit a non-dirtyable op
 				containerRuntime.submit(nonDirtyableOp);
 
-				(containerRuntime as unknown as IContainerRuntimeBaseInternal).enterStagingMode();
+				// Test-only: access private staging methods via any cast
+				// eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any
+				(containerRuntime as any).enterStagingMode();
 
 				// Submit an op in staging mode - we will discard it later
 				sharedMap.set("key", "value");
@@ -307,9 +308,9 @@ describe("Document Dirty", () => {
 				// Dirty due to staged op
 				checkDirtyState("after value set", true, 0);
 
-				(containerRuntime as unknown as IContainerRuntimeBaseInternal).exitStagingMode(
-					"discard",
-				);
+				// Test-only: access private staging methods via any cast
+				// eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any
+				(containerRuntime as any).exitStagingMode("discard");
 				// Not dirty since all that's left is a non-dirtyable op
 				checkDirtyState("after discarding staged changes", false, 1);
 

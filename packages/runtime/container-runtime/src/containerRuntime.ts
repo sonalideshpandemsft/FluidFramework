@@ -1314,7 +1314,10 @@ export class ContainerRuntime
 		// or zero. This must be done before Container replays saved ops.
 		await runtime.pendingStateManager.applyStashedOpsAt(runtimeSequenceNumber ?? 0);
 
-		const stagingController = new StagingController(runtime);
+		const stagingController = new StagingController(
+			runtime.enterStagingMode,
+			runtime.exitStagingMode,
+		);
 		return { runtime, stagingController };
 	}
 
@@ -3665,7 +3668,7 @@ export class ContainerRuntime
 	 * Enter Staging Mode, such that ops submitted to the ContainerRuntime will not be sent to the ordering service.
 	 * To exit Staging Mode, call exitStagingMode with "commit" or "discard".
 	 */
-	public enterStagingMode = (): void => {
+	private readonly enterStagingMode = (): void => {
 		if (this.inStagingMode) {
 			throw new UsageError("Already in staging mode");
 		}
@@ -3688,7 +3691,7 @@ export class ContainerRuntime
 	 * `"discard"` rolls back all changes made while in staging mode.
 	 * @param options - Options for the exit action (only applicable to `"commit"`).
 	 */
-	public exitStagingMode = (
+	private readonly exitStagingMode = (
 		action: "commit" | "discard",
 		options?: Partial<CommitStagedChangesOptionsInternal>,
 	): void => {

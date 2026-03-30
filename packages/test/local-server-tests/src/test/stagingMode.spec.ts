@@ -18,7 +18,7 @@ import {
 } from "@fluidframework/container-loader/internal";
 import {
 	IContainerRuntimeOptions,
-	loadContainerRuntime,
+	loadContainerRuntimeAlpha,
 } from "@fluidframework/container-runtime/internal";
 import type {
 	ConfigTypes,
@@ -30,7 +30,7 @@ import type { SessionSpaceCompressedId } from "@fluidframework/id-compressor/int
 import { SharedMap } from "@fluidframework/map/internal";
 import type {
 	IContainerRuntimeBase,
-	IContainerRuntimeBaseInternal,
+	IStagingController,
 	CommitStagedChangesOptionsInternal,
 } from "@fluidframework/runtime-definitions/internal";
 import {
@@ -59,8 +59,7 @@ class DataObjectWithStagingMode extends DataObject {
 			? -1
 			: DataObjectWithStagingMode.instanceCount++;
 
-	private readonly containerRuntimeInternal = this.context
-		.containerRuntime as IContainerRuntimeBaseInternal;
+	public stagingController: IStagingController | undefined;
 	get DataObjectWithStagingMode(): this {
 		return this;
 	}
@@ -119,14 +118,19 @@ class DataObjectWithStagingMode extends DataObject {
 	}
 
 	public enterStagingMode(): void {
-		this.containerRuntimeInternal.enterStagingMode();
+		assert(this.stagingController !== undefined, "stagingController must be set");
+		this.stagingController.enterStagingMode();
 	}
 
 	public exitStagingMode(
 		action: "commit" | "discard",
 		options?: Partial<CommitStagedChangesOptionsInternal>,
 	): void {
-		this.containerRuntimeInternal.exitStagingMode(action, options);
+		assert(this.stagingController !== undefined, "stagingController must be set");
+		// StagingController.exitStagingMode supports options even though IStagingController does not
+		// (CommitStagedChangesOptionsInternal is @internal, so can't be on the @alpha interface)
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		(this.stagingController as any).exitStagingMode(action, options);
 	}
 }
 
@@ -145,7 +149,9 @@ const runtimeFactory: IRuntimeFactory = {
 		const runtimeOptions: IContainerRuntimeOptions = {
 			enableRuntimeIdCompressor: "on",
 		};
-		const runtime = await loadContainerRuntime({
+		// eslint-disable-next-line prefer-const
+		let stagingController: IStagingController | undefined;
+		const { runtime, stagingController: sc } = await loadContainerRuntimeAlpha({
 			context,
 			existing,
 			registryEntries: [[dataObjectFactory.type, Promise.resolve(dataObjectFactory)]],
@@ -158,9 +164,15 @@ const runtimeFactory: IRuntimeFactory = {
 				}
 				const root = await rt.getAliasedDataStoreEntryPoint("default");
 				assert(root !== undefined, "default must exist");
-				return root.get();
+				const dataObject = (await root.get()) as DataObjectWithStagingMode;
+				// stagingController is set after loadContainerRuntimeAlpha returns,
+				// but provideEntryPoint is called lazily by container.getEntryPoint().
+				assert(stagingController !== undefined, "stagingController must be set by now");
+				dataObject.stagingController = stagingController;
+				return dataObject;
 			},
 		});
+		stagingController = sc;
 		return runtime;
 	},
 };

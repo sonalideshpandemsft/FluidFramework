@@ -33,23 +33,6 @@ export interface CommitStagedChangesOptionsInternal {
  */
 export interface IContainerRuntimeBaseInternal extends IContainerRuntimeBase {
 	/**
-	 * Enters staging mode, allowing changes to be staged before being committed or discarded.
-	 */
-	enterStagingMode(): void;
-
-	/**
-	 * Exits staging mode, either committing or discarding the staged changes.
-	 *
-	 * @param action - `"commit"` sends the buffered ops to the ordering service.
-	 * `"discard"` rolls back all changes made while in staging mode.
-	 * @param options - Options for the exit action (only applicable to `"commit"`).
-	 */
-	exitStagingMode(
-		action: "commit" | "discard",
-		options?: Partial<CommitStagedChangesOptionsInternal>,
-	): void;
-
-	/**
 	 * Indicates whether the container is currently in staging mode.
 	 */
 	readonly inStagingMode: boolean;

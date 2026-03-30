@@ -4,29 +4,44 @@
  */
 
 import type {
+	CommitStagedChangesOptionsInternal,
 	IStagingController,
-	IContainerRuntimeBaseInternal,
 } from "@fluidframework/runtime-definitions/internal";
-import { UsageError } from "@fluidframework/telemetry-utils/internal";
 
 /**
- * Implementation of {@link IStagingController} that delegates to the container runtime's
- * internal staging mode API.
+ * Implementation of {@link IStagingController} that delegates to closures
+ * provided at construction time (bound to the container runtime's private staging methods).
  *
- * This object is created once at container load time and is the exclusive public controller
+ * This object is created once at container load time and is the exclusive controller
  * of staging mode for the container's lifetime.
  */
 export class StagingController implements IStagingController {
-	public constructor(private readonly runtime: IContainerRuntimeBaseInternal) {}
+	public constructor(
+		private readonly enter: () => void,
+		private readonly exit: (
+			action: "commit" | "discard",
+			options?: Partial<CommitStagedChangesOptionsInternal>,
+		) => void,
+	) {}
 
 	public enterStagingMode(): void {
-		this.runtime.enterStagingMode();
+		this.enter();
 	}
 
-	public exitStagingMode(action: "commit" | "discard"): void {
-		if (!this.runtime.inStagingMode) {
-			throw new UsageError("Cannot exit staging mode: not currently in staging mode");
-		}
-		this.runtime.exitStagingMode(action);
+	/**
+	 * Exit staging mode and either commit or discard the staged changes.
+	 *
+	 * @param action - `"commit"` sends the buffered ops to the ordering service.
+	 * `"discard"` rolls back all changes made while in staging mode.
+	 * @param options - Options for the exit action (only applicable to `"commit"`).
+	 * Note: This parameter is not part of the {@link IStagingController} interface
+	 * since the options type is `@internal`. It's available in internal code that
+	 * references `StagingController` directly.
+	 */
+	public exitStagingMode(
+		action: "commit" | "discard",
+		options?: Partial<CommitStagedChangesOptionsInternal>,
+	): void {
+		this.exit(action, options);
 	}
 }

@@ -915,6 +915,7 @@ describe("Runtime", () => {
 			for (const flushMode of [FlushMode.TurnBased, FlushMode.Immediate]) {
 				describe(`orderSequentially with flush mode: ${FlushMode[flushMode]}`, () => {
 					let containerRuntime: ContainerRuntime_WithPrivates;
+					let stagingController: IStagingController;
 					const containerErrors: ICriticalContainerError[] = [];
 					let submittedOpsCount: number = 0;
 
@@ -952,14 +953,15 @@ describe("Runtime", () => {
 							},
 							flushMode,
 						};
-						const { runtime } = await ContainerRuntime.loadRuntime2({
+						const result = await ContainerRuntime.loadRuntime2({
 							context: getMockContextForOrderSequentially() as IContainerContext,
 							registry: new FluidDataStoreRegistry([]),
 							existing: false,
 							runtimeOptions,
 							provideEntryPoint: mockProvideEntryPoint,
 						});
-						containerRuntime = runtime as unknown as ContainerRuntime_WithPrivates;
+						containerRuntime = result.runtime as unknown as ContainerRuntime_WithPrivates;
+						stagingController = result.stagingController;
 						containerErrors.length = 0;
 						submittedOpsCount = 0;
 					});
@@ -986,7 +988,7 @@ describe("Runtime", () => {
 					it("orderSequentially while in StagingMode works", async () => {
 						stubChannelCollection(containerRuntime);
 
-						containerRuntime.enterStagingMode();
+						stagingController.enterStagingMode();
 
 						containerRuntime.orderSequentially(() => {
 							submitDataStoreOp(containerRuntime, "1", testDataStoreMessage);
@@ -997,7 +999,7 @@ describe("Runtime", () => {
 							"No ops should be submitted in Staging Mode",
 						);
 
-						containerRuntime.exitStagingMode("commit");
+						stagingController.exitStagingMode("commit");
 
 						assert.strictEqual(
 							submittedOpsCount,
@@ -1011,12 +1013,12 @@ describe("Runtime", () => {
 						it("commitChanges under orderSequentially (happens to fail)", async () => {
 							stubChannelCollection(containerRuntime);
 
-							containerRuntime.enterStagingMode();
+							stagingController.enterStagingMode();
 
 							assert.throws(() => {
 								containerRuntime.orderSequentially(() => {
 									submitDataStoreOp(containerRuntime, "1", testDataStoreMessage);
-									containerRuntime.exitStagingMode("commit");
+									stagingController.exitStagingMode("commit");
 								});
 							});
 						});
@@ -1024,12 +1026,12 @@ describe("Runtime", () => {
 						it("discardChanges under orderSequentially (does not happen to fail)", async () => {
 							stubChannelCollection(containerRuntime);
 
-							containerRuntime.enterStagingMode();
+							stagingController.enterStagingMode();
 
 							assert.doesNotThrow(() => {
 								containerRuntime.orderSequentially(() => {
 									submitDataStoreOp(containerRuntime, "1", testDataStoreMessage);
-									containerRuntime.exitStagingMode("discard");
+									stagingController.exitStagingMode("discard");
 								});
 							});
 						});
@@ -1039,7 +1041,7 @@ describe("Runtime", () => {
 						assert.throws(
 							() =>
 								containerRuntime.orderSequentially(() => {
-									containerRuntime.enterStagingMode();
+									stagingController.enterStagingMode();
 								}),
 							(e: Error & IErrorBase) =>
 								e.errorType === ContainerErrorTypes.usageError &&
@@ -4159,16 +4161,18 @@ describe("Runtime", () => {
 
 		describe("Staging Mode", () => {
 			let containerRuntime: ContainerRuntime_WithPrivates;
+			let stagingController: IStagingController;
 
 			beforeEach("init", async () => {
-				const { runtime } = await ContainerRuntime.loadRuntime2({
+				const result = await ContainerRuntime.loadRuntime2({
 					context: getMockContext() as IContainerContext,
 					registry: new FluidDataStoreRegistry([]),
 					existing: false,
 					runtimeOptions: {},
 					provideEntryPoint: mockProvideEntryPoint,
 				});
-				containerRuntime = runtime as unknown as ContainerRuntime_WithPrivates;
+				containerRuntime = result.runtime as unknown as ContainerRuntime_WithPrivates;
+				stagingController = result.stagingController;
 				submittedOps.length = 0; // reuse array defined higher in this file
 			});
 
@@ -4182,14 +4186,14 @@ describe("Runtime", () => {
 					containerRuntime.attachState === AttachState.Attached,
 					"PRECONDITION: Expected Attached container",
 				);
-				containerRuntime.enterStagingMode();
+				stagingController.enterStagingMode();
 				assert.equal(
 					containerRuntime.inStagingMode,
 					true,
 					"Runtime should be in staging mode after entry",
 				);
 
-				containerRuntime.exitStagingMode("commit");
+				stagingController.exitStagingMode("commit");
 				assert.equal(
 					containerRuntime.inStagingMode,
 					false,
@@ -4197,8 +4201,8 @@ describe("Runtime", () => {
 				);
 
 				// Enter / discard as a second exit-path
-				containerRuntime.enterStagingMode();
-				containerRuntime.exitStagingMode("discard");
+				stagingController.enterStagingMode();
+				stagingController.exitStagingMode("discard");
 				assert.equal(
 					containerRuntime.inStagingMode,
 					false,
@@ -4207,17 +4211,17 @@ describe("Runtime", () => {
 			});
 
 			it("entering staging mode twice not allowed", () => {
-				containerRuntime.enterStagingMode();
+				stagingController.enterStagingMode();
 				assert.throws(
-					() => containerRuntime.enterStagingMode(),
+					() => stagingController.enterStagingMode(),
 					(error: Error & IErrorBase) =>
 						error.errorType === ContainerErrorTypes.usageError &&
 						error.message === "Already in staging mode",
 					"Should not allow entering staging mode while already in staging mode",
 				);
-				containerRuntime.exitStagingMode("discard");
+				stagingController.exitStagingMode("discard");
 				// Now we can enter staging mode again
-				containerRuntime.enterStagingMode();
+				stagingController.enterStagingMode();
 				assert.equal(
 					containerRuntime.inStagingMode,
 					true,
@@ -4229,17 +4233,17 @@ describe("Runtime", () => {
 				const mockContext = getMockContext({
 					attachState: AttachState.Attaching,
 				}) as IContainerContext;
-				const { runtime } = await ContainerRuntime.loadRuntime2({
+				const result = await ContainerRuntime.loadRuntime2({
 					context: mockContext,
 					registry: new FluidDataStoreRegistry([]),
 					existing: false,
 					runtimeOptions: {},
 					provideEntryPoint: mockProvideEntryPoint,
 				});
-				containerRuntime = runtime as unknown as ContainerRuntime_WithPrivates;
+				containerRuntime = result.runtime as unknown as ContainerRuntime_WithPrivates;
 
 				assert.doesNotThrow(
-					() => containerRuntime.enterStagingMode(),
+					() => result.stagingController.enterStagingMode(),
 					"Should allow entering staging mode while Attaching",
 				);
 			});
@@ -4248,17 +4252,17 @@ describe("Runtime", () => {
 				const mockContext = getMockContext({
 					attachState: AttachState.Detached,
 				}) as IContainerContext;
-				const { runtime } = await ContainerRuntime.loadRuntime2({
+				const result = await ContainerRuntime.loadRuntime2({
 					context: mockContext,
 					registry: new FluidDataStoreRegistry([]),
 					existing: false,
 					runtimeOptions: {},
 					provideEntryPoint: mockProvideEntryPoint,
 				});
-				containerRuntime = runtime as unknown as ContainerRuntime_WithPrivates;
+				containerRuntime = result.runtime as unknown as ContainerRuntime_WithPrivates;
 
 				assert.throws(
-					() => containerRuntime.enterStagingMode(),
+					() => result.stagingController.enterStagingMode(),
 					(error: Error & IErrorBase) =>
 						error.errorType === ContainerErrorTypes.usageError &&
 						error.message === "Cannot enter staging mode while Detached",
@@ -4272,7 +4276,7 @@ describe("Runtime", () => {
 				// Won't be resubmitted when exiting staging mode
 				submitDataStoreOp(containerRuntime, "1", genTestDataStoreMessage("pre-staging"));
 
-				containerRuntime.enterStagingMode();
+				stagingController.enterStagingMode();
 				assert(
 					channelCollectionStub.notifyStagingMode.calledOnceWithExactly(true),
 					"Expected notifyStagingMode to be called with true",
@@ -4288,7 +4292,7 @@ describe("Runtime", () => {
 				assert.equal(submittedOps.length, 1, "Only expected the 1 pre-staging op");
 
 				// default options: { squash: false }
-				containerRuntime.exitStagingMode("commit");
+				stagingController.exitStagingMode("commit");
 
 				assert(
 					channelCollectionStub.reSubmitContainerMessage.calledOnce,
@@ -4330,7 +4334,7 @@ describe("Runtime", () => {
 					"LOCAL_OP_METADATA",
 				);
 
-				containerRuntime.enterStagingMode();
+				stagingController.enterStagingMode();
 
 				// Entering staging mode triggers a flush, so we should see the pre-staging op sent,
 				// but not the staged op (even with flush)
@@ -4342,7 +4346,7 @@ describe("Runtime", () => {
 				containerRuntime.flush();
 				assert.equal(submittedOps.length, 1, "No more ops expected while staged");
 
-				containerRuntime.exitStagingMode("discard");
+				stagingController.exitStagingMode("discard");
 
 				assert.deepEqual(
 					channelCollectionStub.rollbackDataStoreOp.getCalls().map((call) => call.args),
@@ -4369,7 +4373,7 @@ describe("Runtime", () => {
 			it("discardChanges resets isDirty state", () => {
 				stubChannelCollection(containerRuntime);
 
-				containerRuntime.enterStagingMode();
+				stagingController.enterStagingMode();
 
 				submitDataStoreOp(
 					containerRuntime,
@@ -4387,20 +4391,22 @@ describe("Runtime", () => {
 				containerRuntime.flush();
 				assert.equal(containerRuntime.isDirty, true, "Runtime should be dirty (from PSM)");
 
-				containerRuntime.exitStagingMode("discard");
+				stagingController.exitStagingMode("discard");
 
 				assert.equal(containerRuntime.isDirty, false, "Runtime should not be dirty anymore");
 			});
 
 			describe("stagingModeAutoFlushThreshold", () => {
 				let runtimeWithThreshold: ContainerRuntime_WithPrivates;
+				let thresholdStagingController: IStagingController;
 				let mockContext: Partial<IContainerContext>;
 
-				async function createRuntimeWithThreshold(
-					threshold: number,
-				): Promise<ContainerRuntime_WithPrivates> {
+				async function createRuntimeWithThreshold(threshold: number): Promise<{
+					runtime: ContainerRuntime_WithPrivates;
+					stagingController: IStagingController;
+				}> {
 					mockContext = getMockContext() as IContainerContext;
-					const { runtime } = await ContainerRuntime.loadRuntime2({
+					const result = await ContainerRuntime.loadRuntime2({
 						context: mockContext as IContainerContext,
 						registry: new FluidDataStoreRegistry([]),
 						existing: false,
@@ -4412,7 +4418,10 @@ describe("Runtime", () => {
 						},
 						provideEntryPoint: mockProvideEntryPoint,
 					});
-					return runtime as unknown as ContainerRuntime_WithPrivates;
+					return {
+						runtime: result.runtime as unknown as ContainerRuntime_WithPrivates,
+						stagingController: result.stagingController,
+					};
 				}
 
 				afterEach(() => {
@@ -4421,11 +4430,12 @@ describe("Runtime", () => {
 				});
 
 				it("ops accumulate under threshold during staging mode", async () => {
-					runtimeWithThreshold = await createRuntimeWithThreshold(10);
+					({ runtime: runtimeWithThreshold, stagingController: thresholdStagingController } =
+						await createRuntimeWithThreshold(10));
 					stubChannelCollection(runtimeWithThreshold);
 					submittedOps.length = 0;
 
-					runtimeWithThreshold.enterStagingMode();
+					thresholdStagingController.enterStagingMode();
 					// Submit 5 ops across multiple turns — under the threshold of 10
 					submitDataStoreOp(runtimeWithThreshold, "1", genTestDataStoreMessage("op1"));
 					await Promise.resolve();
@@ -4450,7 +4460,7 @@ describe("Runtime", () => {
 						"All 5 ops should be in the outbox",
 					);
 
-					runtimeWithThreshold.exitStagingMode("commit");
+					thresholdStagingController.exitStagingMode("commit");
 					assert.equal(
 						submittedOps.length,
 						5,
@@ -4462,7 +4472,7 @@ describe("Runtime", () => {
 					const logger = new MockLogger();
 					const threshold = 3;
 					mockContext = getMockContext({ logger }) as IContainerContext;
-					const { runtime } = await ContainerRuntime.loadRuntime2({
+					const result = await ContainerRuntime.loadRuntime2({
 						context: mockContext as IContainerContext,
 						registry: new FluidDataStoreRegistry([]),
 						existing: false,
@@ -4472,11 +4482,12 @@ describe("Runtime", () => {
 						},
 						provideEntryPoint: mockProvideEntryPoint,
 					});
-					runtimeWithThreshold = runtime as unknown as ContainerRuntime_WithPrivates;
+					runtimeWithThreshold = result.runtime as unknown as ContainerRuntime_WithPrivates;
+					thresholdStagingController = result.stagingController;
 					stubChannelCollection(runtimeWithThreshold);
 					submittedOps.length = 0;
 
-					runtimeWithThreshold.enterStagingMode();
+					thresholdStagingController.enterStagingMode();
 
 					// Submit 3 ops — exactly at the threshold
 					submitDataStoreOp(runtimeWithThreshold, "1", genTestDataStoreMessage("op1"));
@@ -4508,7 +4519,7 @@ describe("Runtime", () => {
 					);
 
 					// Exit staging mode and verify perf event includes auto-flush count
-					runtimeWithThreshold.exitStagingMode("commit");
+					thresholdStagingController.exitStagingMode("commit");
 					logger.assertMatchAny([
 						{
 							eventName: "ContainerRuntime:ExitStagingMode_commit_end",
@@ -4518,11 +4529,12 @@ describe("Runtime", () => {
 				});
 
 				it("incoming ops break the batch regardless of threshold", async () => {
-					runtimeWithThreshold = await createRuntimeWithThreshold(Infinity);
+					({ runtime: runtimeWithThreshold, stagingController: thresholdStagingController } =
+						await createRuntimeWithThreshold(Infinity));
 					stubChannelCollection(runtimeWithThreshold);
 					submittedOps.length = 0;
 
-					runtimeWithThreshold.enterStagingMode();
+					thresholdStagingController.enterStagingMode();
 
 					submitDataStoreOp(runtimeWithThreshold, "1", genTestDataStoreMessage("op1"));
 					submitDataStoreOp(runtimeWithThreshold, "2", genTestDataStoreMessage("op2"));
@@ -4563,24 +4575,26 @@ describe("Runtime", () => {
 				});
 
 				it("exit staging mode flushes remaining ops", async () => {
-					runtimeWithThreshold = await createRuntimeWithThreshold(Infinity);
+					({ runtime: runtimeWithThreshold, stagingController: thresholdStagingController } =
+						await createRuntimeWithThreshold(Infinity));
 					stubChannelCollection(runtimeWithThreshold);
 					submittedOps.length = 0;
 
-					runtimeWithThreshold.enterStagingMode();
+					thresholdStagingController.enterStagingMode();
 
 					submitDataStoreOp(runtimeWithThreshold, "1", genTestDataStoreMessage("op1"));
 					submitDataStoreOp(runtimeWithThreshold, "2", genTestDataStoreMessage("op2"));
 					submitDataStoreOp(runtimeWithThreshold, "3", genTestDataStoreMessage("op3"));
 					assert.equal(submittedOps.length, 0, "No ops submitted while staging");
 
-					runtimeWithThreshold.exitStagingMode("commit");
+					thresholdStagingController.exitStagingMode("commit");
 
 					assert(submittedOps.length > 0, "Ops should be submitted after commitChanges");
 				});
 
 				it("has no effect outside staging mode", async () => {
-					runtimeWithThreshold = await createRuntimeWithThreshold(Infinity);
+					({ runtime: runtimeWithThreshold, stagingController: thresholdStagingController } =
+						await createRuntimeWithThreshold(Infinity));
 					stubChannelCollection(runtimeWithThreshold);
 					submittedOps.length = 0;
 
@@ -4600,18 +4614,19 @@ describe("Runtime", () => {
 				it("default threshold suppresses turn-based flushing during staging mode", async () => {
 					// Create runtime WITHOUT explicit stagingModeAutoFlushThreshold — uses the default (1000)
 					mockContext = getMockContext() as IContainerContext;
-					const { runtime } = await ContainerRuntime.loadRuntime2({
+					const result = await ContainerRuntime.loadRuntime2({
 						context: mockContext as IContainerContext,
 						registry: new FluidDataStoreRegistry([]),
 						existing: false,
 						runtimeOptions: {},
 						provideEntryPoint: mockProvideEntryPoint,
 					});
-					runtimeWithThreshold = runtime as unknown as ContainerRuntime_WithPrivates;
+					runtimeWithThreshold = result.runtime as unknown as ContainerRuntime_WithPrivates;
+					thresholdStagingController = result.stagingController;
 					stubChannelCollection(runtimeWithThreshold);
 					submittedOps.length = 0;
 
-					runtimeWithThreshold.enterStagingMode();
+					thresholdStagingController.enterStagingMode();
 
 					// Submit a few ops across turns — well under the default threshold
 					submitDataStoreOp(runtimeWithThreshold, "1", genTestDataStoreMessage("op1"));
@@ -4631,15 +4646,16 @@ describe("Runtime", () => {
 						"Both ops should still be in the outbox (unflushed)",
 					);
 
-					runtimeWithThreshold.exitStagingMode("commit");
+					thresholdStagingController.exitStagingMode("commit");
 				});
 
 				it("discardChanges flushes outbox before rollback", async () => {
-					runtimeWithThreshold = await createRuntimeWithThreshold(Infinity);
+					({ runtime: runtimeWithThreshold, stagingController: thresholdStagingController } =
+						await createRuntimeWithThreshold(Infinity));
 					const channelCollectionStub = stubChannelCollection(runtimeWithThreshold);
 					submittedOps.length = 0;
 
-					runtimeWithThreshold.enterStagingMode();
+					thresholdStagingController.enterStagingMode();
 
 					submitDataStoreOp(
 						runtimeWithThreshold,
@@ -4660,7 +4676,7 @@ describe("Runtime", () => {
 						"2 ops in outbox before discard",
 					);
 
-					runtimeWithThreshold.exitStagingMode("discard");
+					thresholdStagingController.exitStagingMode("discard");
 
 					// Outbox should have been drained before rollback
 					assert.equal(
@@ -4691,7 +4707,7 @@ describe("Runtime", () => {
 							"Fluid.ContainerRuntime.StagingModeAutoFlushThreshold": configThreshold,
 						},
 					}) as IContainerContext;
-					const { runtime } = await ContainerRuntime.loadRuntime2({
+					const result2 = await ContainerRuntime.loadRuntime2({
 						context: mockContext as IContainerContext,
 						registry: new FluidDataStoreRegistry([]),
 						existing: false,
@@ -4701,7 +4717,7 @@ describe("Runtime", () => {
 						},
 						provideEntryPoint: mockProvideEntryPoint,
 					});
-					runtimeWithThreshold = runtime as unknown as ContainerRuntime_WithPrivates;
+					runtimeWithThreshold = result2.runtime as unknown as ContainerRuntime_WithPrivates;
 
 					assert.equal(
 						// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
@@ -4713,7 +4729,8 @@ describe("Runtime", () => {
 
 				it("runtime option takes precedence over default", async () => {
 					const runtimeOptionThreshold = 5;
-					runtimeWithThreshold = await createRuntimeWithThreshold(runtimeOptionThreshold);
+					({ runtime: runtimeWithThreshold } =
+						await createRuntimeWithThreshold(runtimeOptionThreshold));
 
 					assert.equal(
 						// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
@@ -4724,11 +4741,12 @@ describe("Runtime", () => {
 				});
 
 				it("incoming non-runtime op breaks batch during staging mode", async () => {
-					runtimeWithThreshold = await createRuntimeWithThreshold(Infinity);
+					({ runtime: runtimeWithThreshold, stagingController: thresholdStagingController } =
+						await createRuntimeWithThreshold(Infinity));
 					stubChannelCollection(runtimeWithThreshold);
 					submittedOps.length = 0;
 
-					runtimeWithThreshold.enterStagingMode();
+					thresholdStagingController.enterStagingMode();
 
 					submitDataStoreOp(runtimeWithThreshold, "1", genTestDataStoreMessage("op1"));
 					submitDataStoreOp(runtimeWithThreshold, "2", genTestDataStoreMessage("op2"));
@@ -4772,7 +4790,7 @@ describe("Runtime", () => {
 					mockContext = getMockContext({ connected: false }) as IContainerContext;
 					const mockDeltaManager = mockContext.deltaManager as MockDeltaManager;
 
-					const { runtime } = await ContainerRuntime.loadRuntime2({
+					const result3 = await ContainerRuntime.loadRuntime2({
 						context: mockContext as IContainerContext,
 						registry: new FluidDataStoreRegistry([]),
 						existing: false,
@@ -4782,11 +4800,12 @@ describe("Runtime", () => {
 						},
 						provideEntryPoint: mockProvideEntryPoint,
 					});
-					runtimeWithThreshold = runtime as unknown as ContainerRuntime_WithPrivates;
+					runtimeWithThreshold = result3.runtime as unknown as ContainerRuntime_WithPrivates;
+					thresholdStagingController = result3.stagingController;
 					stubChannelCollection(runtimeWithThreshold);
 					submittedOps.length = 0;
 
-					runtimeWithThreshold.enterStagingMode();
+					thresholdStagingController.enterStagingMode();
 
 					// Generate 1st compressed ID while disconnected — queues an IdAllocation op
 					runtimeWithThreshold.idCompressor?.generateCompressedId();
@@ -4825,7 +4844,7 @@ describe("Runtime", () => {
 
 			it("enterStagingMode flushes any pending outbox contents as non-staged", async () => {
 				const context = getMockContext() as IContainerContext;
-				const { runtime: rawRuntime } = await ContainerRuntime.loadRuntime2({
+				const result = await ContainerRuntime.loadRuntime2({
 					context,
 					registry: new FluidDataStoreRegistry([]),
 					existing: false,
@@ -4834,7 +4853,8 @@ describe("Runtime", () => {
 					},
 					provideEntryPoint: mockProvideEntryPoint,
 				});
-				const runtime = rawRuntime as unknown as ContainerRuntime_WithPrivates;
+				const runtime = result.runtime as unknown as ContainerRuntime_WithPrivates;
+				const sc = result.stagingController;
 				stubChannelCollection(runtime);
 				submittedOps.length = 0;
 
@@ -4844,7 +4864,7 @@ describe("Runtime", () => {
 				assert.equal(submittedOps.length, 0, "Ops not yet flushed");
 
 				// Enter staging mode — should flush pre-staging ops as non-staged
-				runtime.enterStagingMode();
+				sc.enterStagingMode();
 				assert.equal(
 					submittedOps.length,
 					2,
@@ -4856,14 +4876,14 @@ describe("Runtime", () => {
 				runtime.flush();
 				assert.equal(submittedOps.length, 2, "Staged ops should NOT be submitted to wire");
 
-				runtime.exitStagingMode("commit");
+				sc.exitStagingMode("commit");
 				assert.equal(submittedOps.length, 3, "All ops should be submitted after commit");
 				runtime.dispose();
 			});
 
 			it("reconnect breaks batch during staging mode", async () => {
 				const context = getMockContext() as IContainerContext;
-				const { runtime: rawRuntime } = await ContainerRuntime.loadRuntime2({
+				const result = await ContainerRuntime.loadRuntime2({
 					context,
 					registry: new FluidDataStoreRegistry([]),
 					existing: false,
@@ -4872,11 +4892,12 @@ describe("Runtime", () => {
 					},
 					provideEntryPoint: mockProvideEntryPoint,
 				});
-				const runtime = rawRuntime as unknown as ContainerRuntime_WithPrivates;
+				const runtime = result.runtime as unknown as ContainerRuntime_WithPrivates;
+				const sc = result.stagingController;
 				stubChannelCollection(runtime);
 				submittedOps.length = 0;
 
-				runtime.enterStagingMode();
+				sc.enterStagingMode();
 
 				// Submit ops while connected (sitting in outbox under threshold)
 				submitDataStoreOp(runtime, "1", genTestDataStoreMessage("op1"));
@@ -4905,7 +4926,7 @@ describe("Runtime", () => {
 
 			it("reconnect resubmits pre-staged batches", async () => {
 				const context = getMockContext() as IContainerContext;
-				const { runtime: rawRuntime } = await ContainerRuntime.loadRuntime2({
+				const result = await ContainerRuntime.loadRuntime2({
 					context,
 					registry: new FluidDataStoreRegistry([]),
 					existing: false,
@@ -4914,7 +4935,8 @@ describe("Runtime", () => {
 					},
 					provideEntryPoint: mockProvideEntryPoint,
 				});
-				const runtime = rawRuntime as unknown as ContainerRuntime_WithPrivates;
+				const runtime = result.runtime as unknown as ContainerRuntime_WithPrivates;
+				const sc = result.stagingController;
 				stubChannelCollection(runtime);
 				submittedOps.length = 0;
 
@@ -4924,7 +4946,7 @@ describe("Runtime", () => {
 				assert.equal(submittedOps.length, 1, "Pre-staging op should be submitted");
 
 				// Enter staging mode and submit more ops
-				runtime.enterStagingMode();
+				sc.enterStagingMode();
 				submitDataStoreOp(
 					runtime,
 					"staged1",
@@ -4951,7 +4973,7 @@ describe("Runtime", () => {
 				const opsAfterReconnect = submittedOps.length;
 
 				// Verify we can still commit the staged changes
-				runtime.exitStagingMode("commit");
+				sc.exitStagingMode("commit");
 				assert(
 					submittedOps.length > opsAfterReconnect,
 					"Staged op should be submitted after commitChanges",
