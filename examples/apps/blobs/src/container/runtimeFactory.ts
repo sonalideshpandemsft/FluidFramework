@@ -38,7 +38,7 @@ export class BlobCollectionContainerRuntimeFactory implements IRuntimeFactory {
 			return blobCollectionHandle.get();
 		};
 
-		const { runtime } = await loadContainerRuntime({
+		const runtime = await loadContainerRuntime({
 			context,
 			registryEntries: new Map([
 				[blobCollectionRegistryKey, Promise.resolve(blobCollectionFactory)],

@@ -145,7 +145,7 @@ const runtimeFactory: IRuntimeFactory = {
 		const runtimeOptions: IContainerRuntimeOptions = {
 			enableRuntimeIdCompressor: "on",
 		};
-		const { runtime } = await loadContainerRuntime({
+		const runtime = await loadContainerRuntime({
 			context,
 			existing,
 			registryEntries: [[dataObjectFactory.type, Promise.resolve(dataObjectFactory)]],

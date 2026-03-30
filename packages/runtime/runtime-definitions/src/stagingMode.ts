@@ -66,7 +66,7 @@ export interface IContainerRuntimeBaseInternal extends IContainerRuntimeBase {
  * Use {@link ContainerRuntimeBaseAlpha.inStagingMode} on the container runtime to check
  * whether the container is currently in staging mode.
  *
- * @legacy @beta
+ * @legacy @alpha
  * @sealed
  */
 export interface IStagingController {

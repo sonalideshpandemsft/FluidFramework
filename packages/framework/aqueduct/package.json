@@ -155,14 +155,7 @@
 		"typescript": "~5.4.5"
 	},
 	"typeValidation": {
-		"broken": {
-			"Class_BaseContainerRuntimeFactory": {
-				"forwardCompat": false
-			},
-			"Class_ContainerRuntimeFactoryWithDefaultDataStore": {
-				"forwardCompat": false
-			}
-		},
+		"broken": {},
 		"entrypoint": "legacy"
 	}
 }

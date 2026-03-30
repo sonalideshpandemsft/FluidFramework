@@ -92,7 +92,7 @@ export const loadCompositeRuntime = async (
 	compositeEntryPoint: CompositeEntryPoint,
 	runtimeOptions?: IContainerRuntimeOptions,
 ): Promise<IContainerRuntime & IRuntime> => {
-	const { runtime } = await loadContainerRuntime({
+	const runtime = await loadContainerRuntime({
 		context,
 		registryEntries: compositeEntryPoint.registryEntries,
 		provideEntryPoint: compositeEntryPoint.provideEntryPoint,

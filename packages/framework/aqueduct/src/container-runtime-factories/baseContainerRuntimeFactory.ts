@@ -23,7 +23,6 @@ import {
 import type {
 	IFluidDataStoreRegistry,
 	IProvideFluidDataStoreRegistry,
-	IStagingController,
 	MinimumVersionForCollab,
 	NamedFluidDataStoreRegistryEntries,
 } from "@fluidframework/runtime-definitions/internal";
@@ -98,15 +97,6 @@ export class BaseContainerRuntimeFactory
 	private readonly provideEntryPoint: (runtime: IContainerRuntime) => Promise<FluidObject>;
 	private readonly minVersionForCollab: MinimumVersionForCollab | undefined;
 
-	/**
-	 * Controller for managing staging mode across the container's lifetime.
-	 *
-	 * @remarks
-	 * This is available after {@link BaseContainerRuntimeFactory.preInitialize} has been called.
-	 * It is the exclusive interface for entering/exiting staging mode.
-	 */
-	public stagingController: IStagingController | undefined;
-
 	public constructor(props: BaseContainerRuntimeFactoryProps) {
 		super();
 
@@ -156,7 +146,7 @@ export class BaseContainerRuntimeFactory
 			scope.IFluidDependencySynthesizer = dc;
 		}
 
-		const { runtime, stagingController } = await loadContainerRuntime({
+		return loadContainerRuntime({
 			context,
 			existing,
 			runtimeOptions: this.runtimeOptions,
@@ -167,8 +157,6 @@ export class BaseContainerRuntimeFactory
 			provideEntryPoint: this.provideEntryPoint,
 			minVersionForCollab: this.minVersionForCollab,
 		});
-		this.stagingController = stagingController;
-		return runtime;
 	}
 
 	/**

@@ -827,10 +827,30 @@ export interface LoadContainerRuntimeParams {
 /**
  * This is meant to be used by a {@link @fluidframework/container-definitions#IRuntimeFactory} to instantiate a container runtime.
  * @param params - An object which specifies all required and optional params necessary to instantiate a runtime.
- * @returns An object containing the runtime and a staging controller.
+ * @returns A runtime which provides all the functionality necessary to bind with the loader layer via the {@link @fluidframework/container-definitions#IRuntime} interface and provide a runtime environment via the {@link @fluidframework/container-runtime-definitions#IContainerRuntime} interface.
  * @legacy @beta
  */
-export async function loadContainerRuntime(params: LoadContainerRuntimeParams): Promise<{
+export async function loadContainerRuntime(
+	params: LoadContainerRuntimeParams,
+): Promise<IContainerRuntime & IRuntime> {
+	const { runtime } = await ContainerRuntime.loadRuntime2({
+		...params,
+		registry: new FluidDataStoreRegistry(params.registryEntries),
+	});
+	return runtime;
+}
+
+/**
+ * Alpha variant of {@link loadContainerRuntime} that returns the runtime along with
+ * a staging controller in an extendable object, allowing additional properties to be
+ * added in the future.
+ *
+ * @param params - An object which specifies all required and optional params necessary to instantiate a runtime.
+ * @returns An object containing the runtime and a staging controller.
+ *
+ * @legacy @alpha
+ */
+export async function loadContainerRuntimeAlpha(params: LoadContainerRuntimeParams): Promise<{
 	runtime: IContainerRuntime & IRuntime;
 	stagingController: IStagingController;
 }> {

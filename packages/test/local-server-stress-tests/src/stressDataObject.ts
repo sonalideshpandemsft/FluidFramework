@@ -392,7 +392,7 @@ export const createRuntimeFactory = (): IRuntimeFactory => {
 			return this;
 		},
 		instantiateRuntime: async (context, existing) => {
-			const { runtime } = await loadContainerRuntime({
+			const runtime = await loadContainerRuntime({
 				context,
 				existing,
 				runtimeOptions,

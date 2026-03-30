@@ -303,7 +303,7 @@ export interface IRuntimeStorageService {
 // @beta @legacy
 export type ISequencedMessageEnvelope = Omit<ISequencedDocumentMessage, "contents" | "clientSequenceNumber">;
 
-// @beta @sealed @legacy
+// @alpha @sealed @legacy
 export interface IStagingController {
     enterStagingMode(): void;
     exitStagingMode(action: "commit" | "discard"): void;

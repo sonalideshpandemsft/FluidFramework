@@ -60,7 +60,7 @@ export class RuntimeFactory extends RuntimeFactoryHelper {
 		context: IContainerContext,
 		existing: boolean,
 	): Promise<IContainerRuntime & IRuntime> {
-		const { runtime } = await loadContainerRuntime({
+		const runtime = await loadContainerRuntime({
 			context,
 			registryEntries: this.registry,
 			existing,
