@@ -23,6 +23,16 @@ import {
 } from "@fluidframework/test-utils/internal";
 import * as semver from "semver";
 
+/**
+ * Test-only type for accessing staging mode methods on ContainerRuntime.
+ * These are private on ContainerRuntime but exist at runtime. We use this
+ * narrow type rather than `any` to keep the test type-safe.
+ */
+interface ContainerRuntime_WithStagingMode {
+	enterStagingMode(): void;
+	exitStagingMode(action: "commit" | "discard"): void;
+}
+
 describeCompat(
 	"StagingMode: readonlyInStagingMode",
 	"FullCompat",
@@ -36,6 +46,8 @@ describeCompat(
 		}): Promise<{
 			container: IContainer;
 			containerRuntime: ContainerRuntimeBaseAlpha;
+			enterStagingMode: () => void;
+			exitStagingMode: (action: "commit" | "discard") => void;
 			dsRuntime: IFluidDataStoreChannel & IFluidDataStoreRuntime;
 			shareDir: ISharedDirectory;
 		}> => {
@@ -82,16 +94,29 @@ describeCompat(
 				await getContainerEntryPointBackCompat<ITestDataObject>(container);
 
 			const containerRuntime = asLegacyAlpha(_context.containerRuntime);
+
+			// In cross-version compat tests the container may be created with an older runtime
+			// that predates the staging mode feature. Skip if the runtime is not ContainerRuntime
+			// (i.e. it's from a version that doesn't have enterStagingMode/exitStagingMode).
+			const { ContainerRuntime } = apis.containerRuntime;
+			if (!(_context.containerRuntime instanceof ContainerRuntime)) {
+				test.skip();
+			}
+			const runtimeWithStaging =
+				_context.containerRuntime as unknown as ContainerRuntime_WithStagingMode;
 			return {
 				container,
 				containerRuntime,
+				enterStagingMode: () => runtimeWithStaging.enterStagingMode(),
+				exitStagingMode: (action: "commit" | "discard") =>
+					runtimeWithStaging.exitStagingMode(action),
 				dsRuntime: _runtime as unknown as IFluidDataStoreChannel & IFluidDataStoreRuntime,
 				shareDir: _root,
 			};
 		};
 
 		it(`should set runtime to readonly when readonlyInStagingMode: true`, async function () {
-			const { containerRuntime, dsRuntime } = await createContainer({
+			const { enterStagingMode, exitStagingMode, dsRuntime } = await createContainer({
 				test: this,
 				readonlyInStagingMode: true,
 			});
@@ -102,7 +127,7 @@ describeCompat(
 				"Runtime should not be readonly before entering staging mode.",
 			);
 
-			const controls = containerRuntime.enterStagingMode?.();
+			enterStagingMode();
 
 			assert.equal(
 				dsRuntime.isReadOnly(),
@@ -110,7 +135,7 @@ describeCompat(
 				"Runtime should be readonly after entering staging mode.",
 			);
 
-			controls?.commitChanges();
+			exitStagingMode("commit");
 
 			assert.equal(
 				dsRuntime.isReadOnly(),
@@ -120,10 +145,11 @@ describeCompat(
 		});
 
 		it(`should preserve readonly state when set before entering staging mode with readonlyInStagingMode: true`, async function () {
-			const { container, containerRuntime, dsRuntime } = await createContainer({
-				test: this,
-				readonlyInStagingMode: true,
-			});
+			const { container, enterStagingMode, exitStagingMode, dsRuntime } =
+				await createContainer({
+					test: this,
+					readonlyInStagingMode: true,
+				});
 
 			container.forceReadonly?.(true);
 
@@ -133,7 +159,7 @@ describeCompat(
 				"Runtime should preserve readonly state set before entering staging mode.",
 			);
 
-			const controls = containerRuntime.enterStagingMode?.();
+			enterStagingMode();
 
 			assert.equal(
 				dsRuntime.isReadOnly(),
@@ -141,7 +167,7 @@ describeCompat(
 				"Runtime should be readonly after entering staging mode.",
 			);
 
-			controls?.commitChanges();
+			exitStagingMode("commit");
 
 			assert.equal(
 				dsRuntime.isReadOnly(),
@@ -151,10 +177,11 @@ describeCompat(
 		});
 
 		it(`should preserve readonly state when set during staging mode with readonlyInStagingMode: true`, async function () {
-			const { container, containerRuntime, dsRuntime } = await createContainer({
-				test: this,
-				readonlyInStagingMode: true,
-			});
+			const { container, enterStagingMode, exitStagingMode, dsRuntime } =
+				await createContainer({
+					test: this,
+					readonlyInStagingMode: true,
+				});
 
 			assert.equal(
 				dsRuntime.isReadOnly(),
@@ -162,7 +189,7 @@ describeCompat(
 				"Runtime should not be readonly before entering staging mode.",
 			);
 
-			const controls = containerRuntime.enterStagingMode?.();
+			enterStagingMode();
 
 			container.forceReadonly?.(true);
 
@@ -172,7 +199,7 @@ describeCompat(
 				"Runtime should preserve readonly state set during staging mode.",
 			);
 
-			controls?.commitChanges();
+			exitStagingMode("commit");
 
 			assert.equal(
 				dsRuntime.isReadOnly(),
@@ -182,7 +209,7 @@ describeCompat(
 		});
 
 		it("should not set runtime to readonly when readonlyInStagingMode: false", async function () {
-			const { containerRuntime, dsRuntime } = await createContainer({
+			const { enterStagingMode, exitStagingMode, dsRuntime } = await createContainer({
 				test: this,
 				readonlyInStagingMode: false,
 			});
@@ -193,7 +220,7 @@ describeCompat(
 				"Runtime should not be readonly before entering staging mode.",
 			);
 
-			const controls = containerRuntime.enterStagingMode?.();
+			enterStagingMode();
 
 			assert.equal(
 				dsRuntime.isReadOnly(),
@@ -201,7 +228,7 @@ describeCompat(
 				"Runtime should not be readonly when readonlyInStagingMode is false.",
 			);
 
-			controls?.commitChanges();
+			exitStagingMode("commit");
 
 			assert.equal(
 				dsRuntime.isReadOnly(),
@@ -211,16 +238,18 @@ describeCompat(
 		});
 
 		it("should allow changes readonlyInStagingMode: false", async function () {
-			const { container, containerRuntime, shareDir } = await createContainer({
-				test: this,
-				readonlyInStagingMode: false,
-			});
+			const { container, enterStagingMode, exitStagingMode, shareDir } = await createContainer(
+				{
+					test: this,
+					readonlyInStagingMode: false,
+				},
+			);
 
-			const controls = containerRuntime.enterStagingMode?.();
+			enterStagingMode();
 
 			shareDir.set("test", "test");
 
-			controls?.commitChanges();
+			exitStagingMode("commit");
 
 			if (container.isDirty) {
 				await timeoutPromise((resolve) => {
@@ -238,16 +267,17 @@ describeCompat(
 				},
 			],
 			async function () {
-				const { container, containerRuntime, shareDir } = await createContainer({
-					test: this,
-					readonlyInStagingMode: true,
-				});
+				const { container, enterStagingMode, exitStagingMode, shareDir } =
+					await createContainer({
+						test: this,
+						readonlyInStagingMode: true,
+					});
 
-				const controls = containerRuntime.enterStagingMode?.();
+				enterStagingMode();
 
 				shareDir.set("test", "test");
 
-				controls?.commitChanges();
+				exitStagingMode("commit");
 
 				if (container.isDirty) {
 					await timeoutPromise((resolve) => {

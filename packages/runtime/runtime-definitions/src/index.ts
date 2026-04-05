@@ -96,9 +96,8 @@ export type { MinimumVersionForCollab } from "./compatibilityDefinitions.js";
 
 export {
 	type ContainerRuntimeBaseAlpha,
-	type StageControlsAlpha,
 	type CommitStagedChangesOptionsInternal,
 	type IContainerRuntimeBaseInternal,
-	type StageControlsInternal,
+	type IStagingController,
 	asLegacyAlpha,
 } from "./stagingMode.js";

@@ -28,52 +28,58 @@ export interface CommitStagedChangesOptionsInternal {
 }
 
 /**
- * Controls for managing staged changes in experimental staging mode.
- *
- * Provides methods to either commit or discard changes made while in staging mode.
+ * Experimental extension of {@link IContainerRuntimeBase} to support staging mode.
  * @internal
  */
-export interface StageControlsInternal extends StageControlsAlpha {
+export interface IContainerRuntimeBaseInternal extends IContainerRuntimeBase {
 	/**
-	 * Exit staging mode and commit to any changes made while in staging mode.
-	 * This will cause them to be sent to the ordering service, and subsequent changes
-	 * made by this container will additionally flow freely to the ordering service.
-	 * @param options - Options when committing changes.
+	 * Indicates whether the container is currently in staging mode.
 	 */
-	readonly commitChanges: (options?: Partial<CommitStagedChangesOptionsInternal>) => void;
+	readonly inStagingMode: boolean;
 }
 
 /**
- * Controls for managing staged changes in alpha staging mode.
+ * Controller for managing staged changes across the lifetime of a container.
  *
- * Provides methods to either commit or discard changes made while in staging mode.
+ * @remarks
+ * Obtained once at container creation time from the alpha container runtime factory.
+ * The holder of this object is the exclusive controller of staging mode —
+ * no other code path can enter or exit staging mode.
+ *
+ * Use {@link ContainerRuntimeBaseAlpha.inStagingMode} on the container runtime to check
+ * whether the container is currently in staging mode.
  *
  * @legacy @alpha
  * @sealed
  */
-export interface StageControlsAlpha {
+export interface IStagingController {
 	/**
-	 * Exit staging mode and commit to any changes made while in staging mode.
-	 * This will cause them to be sent to the ordering service, and subsequent changes
-	 * made by this container will additionally flow freely to the ordering service.
+	 * Enter staging mode. While in staging mode, ops are buffered locally
+	 * and not sent to the ordering service until
+	 * {@link IStagingController.exitStagingMode | exitStagingMode("commit")} is called.
+	 *
+	 * @throws Will throw if already in staging mode or if the container is detached.
 	 */
-	readonly commitChanges: () => void;
+	enterStagingMode(): void;
+
 	/**
-	 * Exit staging mode and discard any changes made while in staging mode.
+	 * Exit staging mode and either commit or discard the staged changes.
+	 *
+	 * @param action - `"commit"` sends the buffered ops to the ordering service.
+	 * `"discard"` rolls back all changes made while in staging mode.
+	 *
+	 * @throws Will throw if not currently in staging mode.
 	 */
-	readonly discardChanges: () => void;
+	exitStagingMode(action: "commit" | "discard"): void;
 }
 
 /**
- * Experimental extension of {@link IContainerRuntimeBase} to support staging mode.
- * @internal
+ * Converts types to their alpha counterparts to expose alpha functionality.
+ * @legacy @alpha
+ * @sealed
  */
-export interface IContainerRuntimeBaseInternal extends ContainerRuntimeBaseAlpha {
-	/**
-	 * Enters staging mode, allowing changes to be staged before being committed or discarded.
-	 * @returns Controls for committing or discarding staged changes.
-	 */
-	enterStagingMode(): StageControlsInternal;
+export function asLegacyAlpha(base: IContainerRuntimeBase): ContainerRuntimeBaseAlpha {
+	return base as ContainerRuntimeBaseAlpha;
 }
 
 /**
@@ -84,21 +90,7 @@ export interface IContainerRuntimeBaseInternal extends ContainerRuntimeBaseAlpha
  */
 export interface ContainerRuntimeBaseAlpha extends IContainerRuntimeBase {
 	/**
-	 * Enters staging mode, allowing changes to be staged before being committed or discarded.
-	 * @returns Controls for committing or discarding staged changes.
-	 */
-	enterStagingMode(): StageControlsAlpha;
-	/**
 	 * Indicates whether the container is currently in staging mode.
 	 */
 	readonly inStagingMode: boolean;
-}
-
-/**
- * Converts types to their alpha counterparts to expose alpha functionality.
- * @legacy @alpha
- * @sealed
- */
-export function asLegacyAlpha(base: IContainerRuntimeBase): ContainerRuntimeBaseAlpha {
-	return base as ContainerRuntimeBaseAlpha;
 }
