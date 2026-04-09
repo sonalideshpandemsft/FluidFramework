@@ -40,7 +40,7 @@ These aliases are available in all terminal sessions (after installing agency):
 | Alias | Command | Purpose |
 |---|---|---|
 | `dev` | `repoverlay switch --copy nori && agency claude ... -- --model opus` | Launch Claude optimized for feature work and debugging |
-| `claude` | `repoverlay switch --copy ff-claude && agency claude ... -- --model opus` | General purpose Claude Code agent |
+| `claude` | `repoverlay remove --all && agency claude ... -- --model opus` | General purpose Claude Code agent |
 
 ### Copilot
 
@@ -53,14 +53,14 @@ These aliases are available in all terminal sessions (after installing agency):
 
 The built-in aliases include at least ADO, WorkIQ, and EngHub MCP servers.
 You can also launch an agent with your own combination of MCP servers using the `--mcp` flag.
-Stack as many as you need (and watch for browser authentication popups):
+Stack as many as you need (and watch for browser authentication popups).
 
 ```bash
-# Claude with ADO and Kusto
-agency claude --mcp 'ado --org fluidframework' --mcp 'kusto --service-uri https://kusto.aria.microsoft.com'
+# Claude with an additional Kusto MCP server (ADO, WorkIQ, and EngHub are always included)
+claude --mcp 'kusto --service-uri https://kusto.aria.microsoft.com'
 
-# Copilot with WorkIQ
-agency copilot --mcp 'workiq'
+# Copilot with an additional MCP server
+copilot --mcp 'workiq'
 ```
 
 > Run `agency mcp --help` to see all available MCP servers and their options.
@@ -70,27 +70,6 @@ agency copilot --mcp 'workiq'
 | Alias | Command | Purpose |
 |---|---|---|
 | `ai-reset` | `repoverlay remove --all` | Remove all repoverlay overlays and reset to clean state |
-
-## Connecting via SSH
-
-Access a running AI-enabled Codespace from your local terminal:
-
-```bash
-gh codespace ssh
-```
-
-This enables running AI agents locally while the Codespace provides computing power and repository context.
-
-## What's Different from Standard?
-
-| Addition | Purpose |
-|---|---|
-| Agency CLI | Run AI agents (Claude, GitHub Copilot) from terminal |
-| Repoverlay | Overlay system for context files (agents, skills) |
-| GitHub CLI (`gh`) | Pre-installed for PR workflows and SSH access |
-| SSH daemon | Enables `gh codespace ssh` connections |
-| Agent aliases | Shell shortcuts for common AI commands |
-| Higher compute | 32 CPUs / 64 GB RAM (vs 16 CPUs for Standard) |
 
 ## More Information
 
