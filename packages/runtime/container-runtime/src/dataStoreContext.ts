@@ -71,7 +71,11 @@ import type {
 	ContainerExtensionId,
 	ContainerExtensionExpectations,
 } from "@fluidframework/runtime-definitions/internal";
-import { asLegacyAlpha, channelsTreeName } from "@fluidframework/runtime-definitions/internal";
+import {
+	asLegacyAlpha,
+	channelsTreeName,
+	VisibilityState,
+} from "@fluidframework/runtime-definitions/internal";
 import {
 	addBlobToSummary,
 	isSnapshotFetchRequiredForLoadingGroupId,
@@ -1573,6 +1577,19 @@ export class PendingStateLocalFluidDataStoreContext extends LocalFluidDataStoreC
 	constructor(props: ILocalFluidDataStoreContextProps) {
 		super(props);
 		this._attachState = AttachState.Detached;
+	}
+
+	protected override async bindRuntime(
+		channel: IFluidDataStoreChannel,
+		existing: boolean,
+	): Promise<void> {
+		await super.bindRuntime(channel, existing);
+		// The runtime sets visibilityState to LocallyVisible for existing+Detached datastores.
+		// But pending-state datastores were never actually visible — they must go through
+		// attachGraph() → makeLocallyVisible during staging commit to get their Attach op.
+		// TODO: Add visibilityState to IFluidDataStoreChannel to avoid this cast.
+		(channel as unknown as { visibilityState: VisibilityState }).visibilityState =
+			VisibilityState.NotVisible;
 	}
 }
 

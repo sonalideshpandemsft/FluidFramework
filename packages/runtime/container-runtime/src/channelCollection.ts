@@ -1918,17 +1918,14 @@ export class ChannelCollection
 
 				// Realize the datastore to get its entryPoint handle for the pending handles map.
 				const channel = await dataStoreContext.realize();
-				// Load the entry point to ensure DDSes are initialized (needed for GC data).
+				// Load the entry point to ensure DDSes are initialized (needed for GC
+				// data discovery in makeDataStoreLocallyVisible).
 				await channel.entryPoint.get();
 				const entryHandle = toFluidHandleInternal(channel.entryPoint);
 				const entryPath = entryHandle.absolutePath.startsWith("/")
 					? entryHandle.absolutePath
 					: `/${entryHandle.absolutePath}`;
 				this.pendingHandles.set(entryPath, entryHandle);
-				// The runtime sets visibilityState to LocallyVisible for existing+Detached datastores,
-				// but pending-state datastores were never actually visible. Reset to NotVisible so that
-				// attachGraph() during staging commit properly triggers makeLocallyVisible/Attach op.
-				(channel as unknown as { visibilityState: string }).visibilityState = "NotVisible"; // VisibilityState.NotVisible
 			} else {
 				// Datastore already exists - it has pending channels that need to be added
 				// Get the .channels subtree which contains the DDSes
