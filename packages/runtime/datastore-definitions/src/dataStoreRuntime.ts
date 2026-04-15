@@ -193,7 +193,7 @@ export interface IFluidDataStoreRuntime
 }
 
 /**
- * @legacy @alpha
+ * @legacy @beta
  * @sealed
  */
 export interface IFluidDataStoreRuntimeAlpha extends IFluidDataStoreRuntime {

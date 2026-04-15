@@ -12,7 +12,7 @@ import type { IFluidDataStoreRuntime } from "@fluidframework/datastore-definitio
 import type { ISharedDirectory } from "@fluidframework/map/internal";
 import {
 	asLegacyAlpha,
-	type ContainerRuntimeBaseAlpha,
+	type ContainerRuntimeBaseBeta,
 	type IFluidDataStoreChannel,
 	type IFluidDataStoreContext,
 	type IFluidDataStorePolicies,
@@ -35,7 +35,7 @@ describeCompat(
 			readonlyInStagingMode: IFluidDataStorePolicies["readonlyInStagingMode"];
 		}): Promise<{
 			container: IContainer;
-			containerRuntime: ContainerRuntimeBaseAlpha;
+			containerRuntime: ContainerRuntimeBaseBeta;
 			dsRuntime: IFluidDataStoreChannel & IFluidDataStoreRuntime;
 			shareDir: ISharedDirectory;
 		}> => {

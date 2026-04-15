@@ -64,7 +64,7 @@ import {
 	encodeHandlesInContainerRuntime,
 	type IFluidDataStorePolicies,
 	type MinimumVersionForCollab,
-	asLegacyAlpha,
+	asLegacyBeta,
 	currentSummarizeStepPrefix,
 	currentSummarizeStepPropertyName,
 } from "@fluidframework/runtime-definitions/internal";
@@ -545,7 +545,7 @@ export class FluidDataStoreRuntime
 	 * Implementation of IFluidDataStoreRuntimeAlpha.inStagingMode
 	 */
 	private get inStagingMode(): IFluidDataStoreRuntimeAlpha["inStagingMode"] {
-		return asLegacyAlpha(this.dataStoreContext.containerRuntime)?.inStagingMode;
+		return asLegacyBeta(this.dataStoreContext.containerRuntime)?.inStagingMode;
 	}
 
 	/**

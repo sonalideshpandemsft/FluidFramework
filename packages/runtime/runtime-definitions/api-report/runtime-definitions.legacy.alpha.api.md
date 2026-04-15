@@ -7,8 +7,8 @@
 // @beta @legacy
 export type AliasResult = "Success" | "Conflict" | "AlreadyAliased";
 
-// @alpha @sealed @legacy
-export function asLegacyAlpha(base: IContainerRuntimeBase): ContainerRuntimeBaseAlpha;
+// @beta @sealed @legacy
+export function asLegacyBeta(base: IContainerRuntimeBase): ContainerRuntimeBaseBeta;
 
 // @beta @legacy
 export interface AttributionInfo {
@@ -19,9 +19,9 @@ export interface AttributionInfo {
 // @beta @legacy
 export type AttributionKey = OpAttributionKey | DetachedAttributionKey | LocalAttributionKey;
 
-// @alpha @sealed @legacy
-export interface ContainerRuntimeBaseAlpha extends IContainerRuntimeBase {
-    enterStagingMode(): StageControlsAlpha;
+// @beta @sealed @legacy
+export interface ContainerRuntimeBaseBeta extends IContainerRuntimeBase {
+    enterStagingMode(): StageControls;
     readonly inStagingMode: boolean;
 }
 
@@ -421,8 +421,8 @@ export interface OpAttributionKey {
 // @beta @legacy
 export type PackagePath = readonly string[];
 
-// @alpha @sealed @legacy
-export interface StageControlsAlpha {
+// @beta @sealed @legacy
+export interface StageControls {
     readonly commitChanges: () => void;
     readonly discardChanges: () => void;
 }

@@ -131,7 +131,7 @@ import type {
 	IContainerRuntimeBaseInternal,
 	MinimumVersionForCollab,
 	ContainerExtensionExpectations,
-	ContainerRuntimeBaseAlpha,
+	ContainerRuntimeBaseBeta,
 } from "@fluidframework/runtime-definitions/internal";
 import {
 	addBlobToSummary,
@@ -843,10 +843,10 @@ export async function loadContainerRuntime(
  * @param params - An object which specifies all required and optional params necessary to instantiate a runtime.
  * @returns An object containing the runtime.
  *
- * @legacy @alpha
+ * @legacy @beta
  */
-export async function loadContainerRuntimeAlpha(params: LoadContainerRuntimeParams): Promise<{
-	runtime: IContainerRuntime & ContainerRuntimeBaseAlpha & IRuntime;
+export async function loadContainerRuntimeBeta(params: LoadContainerRuntimeParams): Promise<{
+	runtime: IContainerRuntime & ContainerRuntimeBaseBeta & IRuntime;
 }> {
 	return ContainerRuntime.loadRuntime2({
 		...params,

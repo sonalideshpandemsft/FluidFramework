@@ -7,6 +7,9 @@
 // @beta @legacy
 export type AliasResult = "Success" | "Conflict" | "AlreadyAliased";
 
+// @beta @sealed @legacy
+export function asLegacyBeta(base: IContainerRuntimeBase): ContainerRuntimeBaseBeta;
+
 // @beta @legacy
 export interface AttributionInfo {
     timestamp: number;
@@ -15,6 +18,12 @@ export interface AttributionInfo {
 
 // @beta @legacy
 export type AttributionKey = OpAttributionKey | DetachedAttributionKey | LocalAttributionKey;
+
+// @beta @sealed @legacy
+export interface ContainerRuntimeBaseBeta extends IContainerRuntimeBase {
+    enterStagingMode(): StageControls;
+    readonly inStagingMode: boolean;
+}
 
 // @beta @legacy (undocumented)
 export type CreateChildSummarizerNodeFn = (summarizeInternal: SummarizeInternalFn, getGCDataFn: (fullGC?: boolean) => Promise<IGarbageCollectionData>,
@@ -411,6 +420,12 @@ export interface OpAttributionKey {
 
 // @beta @legacy
 export type PackagePath = readonly string[];
+
+// @beta @sealed @legacy
+export interface StageControls {
+    readonly commitChanges: () => void;
+    readonly discardChanges: () => void;
+}
 
 // @beta @legacy (undocumented)
 export type SummarizeInternalFn = (fullTree: boolean, trackState: boolean, telemetryContext?: ITelemetryContext, incrementalSummaryContext?: IExperimentalIncrementalSummaryContext) => Promise<ISummarizeInternalResult>;

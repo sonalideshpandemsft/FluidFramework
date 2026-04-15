@@ -26,7 +26,7 @@ import type { IChannel } from "@fluidframework/datastore-definitions/internal";
 // Valid export as per package.json export map
 import { modifyClusterSize } from "@fluidframework/id-compressor/internal/test-utils";
 import { ISharedMap, SharedMap } from "@fluidframework/map/internal";
-import type { StageControlsAlpha } from "@fluidframework/runtime-definitions/internal";
+import type { StageControls } from "@fluidframework/runtime-definitions/internal";
 import {
 	RuntimeHeaders,
 	toFluidHandleInternal,
@@ -335,7 +335,7 @@ export class DefaultStressDataObject extends StressDataObject {
 		this._locallyCreatedObjects.push(obj);
 	}
 
-	private stageControls: StageControlsAlpha | undefined;
+	private stageControls: StageControls | undefined;
 	private readonly containerRuntimeExp = asLegacyAlpha(this.context.containerRuntime);
 	public enterStagingMode(): void {
 		assert(

@@ -106,6 +106,14 @@ export interface IFluidDataStoreRuntime extends IEventProvider<IFluidDataStoreRu
     waitAttached(): Promise<void>;
 }
 
+// @beta @sealed @legacy (undocumented)
+export interface IFluidDataStoreRuntimeAlpha extends IFluidDataStoreRuntime {
+    // (undocumented)
+    readonly inStagingMode: boolean;
+    // (undocumented)
+    readonly isDirty: boolean;
+}
+
 // @beta @legacy
 export interface IFluidDataStoreRuntimeEvents extends IEvent {
     // (undocumented)

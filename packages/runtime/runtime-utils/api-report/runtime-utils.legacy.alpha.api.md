@@ -5,7 +5,7 @@
 ```ts
 
 // @alpha @legacy
-export function asLegacyAlpha(runtime: IContainerRuntimeBase): ContainerRuntimeBaseAlpha;
+export function asLegacyAlpha(runtime: IContainerRuntimeBase): ContainerRuntimeBaseBeta;
 
 // @alpha @legacy
 export function asLegacyAlpha(runtime: IFluidDataStoreRuntime): IFluidDataStoreRuntimeAlpha;
