@@ -444,9 +444,7 @@ export interface IFluidDataStoreChannel extends IDisposable {
 	 * @param channelsTree - The summary tree containing the pending channels to load.
 	 * @returns A map of absolute handle path to the canonical handle for each loaded channel.
 	 */
-	loadPendingChannels?(
-		channelsTree: ISummaryTree,
-	): Promise<Map<string, IFluidHandleInternal>>;
+	loadPendingChannels?(channelsTree: ISummaryTree): Promise<Map<string, IFluidHandleInternal>>;
 }
 
 /**
@@ -503,7 +501,7 @@ export interface IFluidParentContext
 	 * Consumed by {@link @fluidframework/container-runtime#FluidDataStoreContext}.
 	 * See {@link @fluidframework/container-runtime#LoadContainerRuntimeParams.minVersionForCollab} for more details.
 	 */
-	readonly minVersionForCollab?: MinimumVersionForCollab;
+	readonly minVersionForCollab: MinimumVersionForCollab;
 	readonly deltaManager: IDeltaManager<ISequencedDocumentMessage, IDocumentMessage>;
 	readonly storage: IRuntimeStorageService;
 	readonly baseLogger: ITelemetryBaseLogger;
