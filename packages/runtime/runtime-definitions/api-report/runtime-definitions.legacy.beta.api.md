@@ -99,7 +99,7 @@ export interface IContainerRuntimeBaseEvents extends IEvent {
     (event: "signal", listener: (message: IInboundSignalMessage, local: boolean) => void): any;
     // (undocumented)
     (event: "dispose", listener: () => void): any;
-    (event: "stagingModeChanged", listener: () => void): any;
+    (event: "stagingModeChanged", listener: (stagingModeInfo: StagingModeChangedEvent) => void): any;
 }
 
 // @beta @legacy
@@ -412,6 +412,14 @@ export interface OpAttributionKey {
 
 // @beta @legacy
 export type PackagePath = readonly string[];
+
+// @beta @legacy
+export type StagingModeChangedEvent = {
+    readonly inStagingMode: true;
+} | {
+    readonly inStagingMode: false;
+    readonly commit: boolean;
+};
 
 // @beta @legacy (undocumented)
 export type SummarizeInternalFn = (fullTree: boolean, trackState: boolean, telemetryContext?: ITelemetryContext, incrementalSummaryContext?: IExperimentalIncrementalSummaryContext) => Promise<ISummarizeInternalResult>;
