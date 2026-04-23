@@ -3719,7 +3719,7 @@ export class ContainerRuntime
 						this.channelCollection.notifyStagingMode(false);
 					},
 				);
-				this.emit("stagingModeChanged", true);
+				this.emit("stagingModeChanged");
 			} catch (error) {
 				const normalizedError = normalizeError(error);
 				this.closeFn(normalizedError);
@@ -3754,7 +3754,7 @@ export class ContainerRuntime
 
 		this.stageControls = stageControls;
 		this.channelCollection.notifyStagingMode(true);
-		this.emit("stagingModeChanged", false);
+		this.emit("stagingModeChanged");
 
 		return this.stageControls;
 	};

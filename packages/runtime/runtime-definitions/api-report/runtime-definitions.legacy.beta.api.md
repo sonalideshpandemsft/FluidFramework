@@ -99,7 +99,7 @@ export interface IContainerRuntimeBaseEvents extends IEvent {
     (event: "signal", listener: (message: IInboundSignalMessage, local: boolean) => void): any;
     // (undocumented)
     (event: "dispose", listener: () => void): any;
-    (event: "stagingModeChanged", listener: (canEnterStagingMode: boolean) => void): any;
+    (event: "stagingModeChanged", listener: () => void): any;
 }
 
 // @beta @legacy

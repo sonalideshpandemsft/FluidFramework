@@ -134,9 +134,8 @@ export interface IContainerRuntimeBaseEvents extends IEvent {
 	(event: "dispose", listener: () => void);
 	/**
 	 * Fires when the container runtime enters or exits staging mode.
-	 * @param canEnterStagingMode - `true` if the container runtime exited staging mode and `false` if it entered staging mode.
 	 */
-	(event: "stagingModeChanged", listener: (canEnterStagingMode: boolean) => void);
+	(event: "stagingModeChanged", listener: () => void);
 }
 
 /**
