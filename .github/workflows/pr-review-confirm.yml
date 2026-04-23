@@ -45,10 +45,12 @@ jobs:
       )
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout scripts
+      - name: Checkout scripts and prompts
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # ratchet:actions/checkout@v6
         with:
-          sparse-checkout: .github/scripts
+          sparse-checkout: |
+            .github/scripts
+            .github/prompts
           persist-credentials: false
 
       # ── Find & download the pending metadata artifact from the most recent ──
@@ -208,26 +210,9 @@ jobs:
           SELECTED: ${{ steps.checkboxes.outputs.selected }}
         run: |
           REVIEWER_CONTEXT=$(python3 .github/scripts/pr_review_propose.py build-qa-context "$SELECTED")
-
-          cat > /tmp/qa-prompt.md <<'PROMPT_EOF'
-You are a helpful PR review assistant. A developer opened a pull request and you proposed
-to run an automated code review. The review plan is:
-
-PROMPT_EOF
-          echo "${REVIEWER_CONTEXT}" >> /tmp/qa-prompt.md
-          cat >> /tmp/qa-prompt.md <<'PROMPT_EOF'
-
-(✓ = queued, ○ = not queued)
-
-The developer asked:
-PROMPT_EOF
-          echo "${REPLY}" >> /tmp/qa-prompt.md
-          cat >> /tmp/qa-prompt.md <<'PROMPT_EOF'
-
-Answer in 1-3 sentences. End with a brief reminder that they can reply "yes" to start
-or toggle the checkboxes in the proposal comment to adjust which reviewers run.
-Write plain text only — no code blocks, no headers. Output the answer to answer.txt.
-PROMPT_EOF
+          export REVIEWER_CONTEXT
+          python3 .github/scripts/pr_review_propose.py render-qa-prompt \
+            .github/prompts/pr-review-qa.md > /tmp/qa-prompt.md
 
           copilot \
             -p "$(cat /tmp/qa-prompt.md)" \
