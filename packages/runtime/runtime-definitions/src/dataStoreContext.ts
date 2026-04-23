@@ -504,7 +504,7 @@ export interface IFluidDataStoreChannel extends IDisposable {
  * - `{ inStagingMode: true }` — the runtime has entered staging mode.
  *
  * - `{ inStagingMode: false, commit: boolean }` — the runtime has exited staging mode.
- * `commit` is `true` when changes were sent to the ordering service, or `false` when they were discarded.
+ * `commit` is `true` when staged changes are submitted to the service, or `false` when they are discarded.
  *
  * @legacy @beta
  */

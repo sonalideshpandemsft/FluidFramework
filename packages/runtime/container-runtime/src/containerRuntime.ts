@@ -3749,7 +3749,13 @@ export class ContainerRuntime
 
 		this.stageControls = stageControls;
 		this.channelCollection.notifyStagingMode(true);
-		this.emit("stagingModeChanged", { inStagingMode: true });
+		try {
+			this.emit("stagingModeChanged", { inStagingMode: true });
+		} catch (error) {
+			const normalizedError = normalizeError(error);
+			this.closeFn(normalizedError);
+			throw normalizedError;
+		}
 
 		return this.stageControls;
 	};
