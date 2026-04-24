@@ -3591,7 +3591,18 @@ export class ContainerRuntime
 		let stageControls: StageControlsInternal | undefined;
 		if (this.mc.config.getBoolean("Fluid.ContainerRuntime.EnableRollback") === true) {
 			if (!this.batchRunner.running && !this.inStagingMode) {
-				stageControls = this.enterStagingMode();
+				// Use silent=true to suppress stagingModeChanged events for orderSequentially.
+				// orderSequentially uses staging mode as a rollback mechanism.
+				// Emitting stagingModeChanged here would:
+				//   - Cause UI flicker — consumers rendering staging mode event would see
+				//      unexpected enter/exit flashes on every orderSequentially call.
+				//   - consumers cannot distinguish this internal usage
+				//      from a user explicitly entering staging mode, as there is no source field
+				//      on the event to filter by.
+				//   - if orderSequentially is
+				//      later reimplemented without staging mode, consumers calibrated
+				//      to these events would break silently.
+				stageControls = this.enterStagingModeCore(true);
 			}
 			// Note: we are not touching any batches other than mainBatch here, for two reasons:
 			// 1. It would not help, as other batches are flushed independently from main batch.
@@ -3667,9 +3678,22 @@ export class ContainerRuntime
 	 * Enter Staging Mode, such that ops submitted to the ContainerRuntime will not be sent to the ordering service.
 	 * To exit Staging Mode, call either discardChanges or commitChanges on the Stage Controls returned from this method.
 	 *
+	 * @remarks
+	 * The `stagingModeChanged` event is emitted when staging mode is entered or exited via this method.
+	 * It is NOT emitted when staging mode is used internally (e.g. by `orderSequentially` for rollback support).
+	 *
 	 * @returns Controls for exiting Staging Mode.
 	 */
-	public enterStagingMode = (): StageControlsInternal => {
+	public enterStagingMode = (): StageControlsInternal => this.enterStagingModeCore(false);
+
+	/**
+	 * Internal implementation of enterStagingMode.
+	 * @param silent - When true, suppresses `stagingModeChanged` event emission.
+	 * Pass `true` when staging mode is used as an internal implementation detail (e.g. by
+	 * `orderSequentially` for rollback support) so that external listeners only observe
+	 * user-initiated staging mode transitions. Pass `false` for all public entry points.
+	 */
+	private readonly enterStagingModeCore = (silent: boolean): StageControlsInternal => {
 		if (this.stageControls !== undefined) {
 			throw new UsageError("Already in staging mode");
 		}
@@ -3711,10 +3735,12 @@ export class ContainerRuntime
 						this.channelCollection.notifyStagingMode(false);
 					},
 				);
-				this.emit("stagingModeChanged", {
-					inStagingMode: false,
-					commit: exitMethod === "commit",
-				});
+				if (!silent) {
+					this.emit("stagingModeChanged", {
+						inStagingMode: false,
+						commit: exitMethod === "commit",
+					});
+				}
 			} catch (error) {
 				const normalizedError = normalizeError(error);
 				this.closeFn(normalizedError);
@@ -3749,12 +3775,14 @@ export class ContainerRuntime
 
 		this.stageControls = stageControls;
 		this.channelCollection.notifyStagingMode(true);
-		try {
-			this.emit("stagingModeChanged", { inStagingMode: true });
-		} catch (error) {
-			const normalizedError = normalizeError(error);
-			this.closeFn(normalizedError);
-			throw normalizedError;
+		if (!silent) {
+			try {
+				this.emit("stagingModeChanged", { inStagingMode: true });
+			} catch (error) {
+				const normalizedError = normalizeError(error);
+				this.closeFn(normalizedError);
+				throw normalizedError;
+			}
 		}
 
 		return this.stageControls;
