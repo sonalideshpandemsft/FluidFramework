@@ -5,6 +5,7 @@
 
 import {
 	type IContainer,
+	type IContainerLoadMode,
 	type IFluidCodeDetails,
 	type IFluidModule,
 	type IHostLoader,
@@ -345,7 +346,7 @@ export class Loader implements IHostLoader {
 		}
 
 		request.headers ??= {};
-		// If set in both query string and headers, use query string.  Also write the value from the query string into the header either way.
+		// If set in both query string and headers, use query string. Also write the value from the query string into the header either way.
 		// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 		request.headers[LoaderHeader.version] =
 			parsed.version ?? request.headers[LoaderHeader.version];
@@ -358,13 +359,38 @@ export class Loader implements IHostLoader {
 		resolvedUrl: IResolvedUrl,
 		pendingLocalState?: IPendingContainerState,
 	): Promise<Container> {
+		const requestHeaders = request.headers as Partial<Record<string, unknown>> | undefined;
+		const requestedVersion = requestHeaders?.[LoaderHeader.version];
+		const loadMode = requestHeaders?.[LoaderHeader.loadMode] as
+			| (Omit<IContainerLoadMode, "opsBeforeReturn"> & {
+					readonly opsBeforeReturn?: IContainerLoadMode["opsBeforeReturn"] | "sequenceNumber";
+			  })
+			| undefined;
+		const requestedLoadToSequenceNumber = requestHeaders?.[LoaderHeader.sequenceNumber];
+		let loadToSequenceNumber: number | undefined;
+
+		if (loadMode?.opsBeforeReturn === "sequenceNumber") {
+			if (
+				typeof requestedLoadToSequenceNumber !== "number" ||
+				!Number.isInteger(requestedLoadToSequenceNumber) ||
+				requestedLoadToSequenceNumber < 0
+			) {
+				throw new Error("sequenceNumber must be set to a non-negative integer");
+			}
+			if (loadMode.deltaConnection !== "none") {
+				throw new Error('deltaConnection must be set to "none"');
+			}
+			loadToSequenceNumber = requestedLoadToSequenceNumber;
+		} else if (requestedLoadToSequenceNumber !== undefined) {
+			throw new Error('opsBeforeReturn must be set to "sequenceNumber"');
+		}
+
 		return Container.load(
 			{
 				resolvedUrl,
-				// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-				version: request.headers?.[LoaderHeader.version] ?? undefined,
-				// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-				loadMode: request.headers?.[LoaderHeader.loadMode],
+				version: typeof requestedVersion === "string" ? requestedVersion : undefined,
+				loadMode: loadMode as IContainerLoadMode | undefined,
+				loadToSequenceNumber,
 				pendingLocalState,
 			},
 			{

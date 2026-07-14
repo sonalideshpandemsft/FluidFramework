@@ -24,6 +24,10 @@ export {
 	type IRehydrateDetachedContainerProps,
 	type ILoadFrozenContainerFromPendingStateProps,
 } from "./createAndLoadContainerUtils.js";
+export {
+	loadContainerToSequenceNumber,
+	type ILoadContainerToSequenceNumberProps,
+} from "./historicalContainerLoad.js";
 export type {
 	LoadSummarizerSummaryResult,
 	OnDemandSummaryResults,

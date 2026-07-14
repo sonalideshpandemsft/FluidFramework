@@ -533,3 +533,14 @@ export interface ISnapshotFetchOptions {
 	 */
 	fetchSource?: FetchSource;
 }
+
+/**
+ * Alpha snapshot fetch options for historical loading.
+ * @legacy @alpha
+ */
+export interface ISnapshotFetchOptionsAlpha extends ISnapshotFetchOptions {
+	/**
+	 * Sequence number the loader should materialize before returning the container.
+	 */
+	loadToSequenceNumber?: number;
+}

@@ -35,6 +35,7 @@ export type {
 	IDocumentStorageService,
 	IDocumentStorageServicePolicies,
 	ISnapshot,
+	ISnapshotFetchOptionsAlpha,
 	ISnapshotFetchOptions,
 	IStream,
 	IStreamResult,
