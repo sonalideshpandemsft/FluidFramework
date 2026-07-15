@@ -7,6 +7,7 @@ import { strict as assert } from "node:assert";
 
 import {
 	OdspVersionManager,
+	type IResolvedVersionSequenceNumbers,
 	type OdspFileVersionRef,
 	type IOdspFileVersionFetcher,
 } from "../odspVersionManager/index.js";
@@ -34,7 +35,7 @@ interface FakeFetcher extends IOdspFileVersionFetcher {
  */
 function makeManager(
 	versions: OdspFileVersionRef[],
-	seqByVersion: Record<string, number>,
+	seqByVersion: Record<string, number | IResolvedVersionSequenceNumbers>,
 ): { manager: OdspVersionManager; fetcher: FakeFetcher } {
 	let listCallCount = 0;
 	const resolved: string[] = [];
@@ -43,13 +44,17 @@ function makeManager(
 			listCallCount++;
 			return versions;
 		},
-		resolveSequenceNumber: async (versionId: string) => {
+		resolveSequenceNumber: async (
+			versionId: string,
+		): Promise<IResolvedVersionSequenceNumbers> => {
 			resolved.push(versionId);
-			const seq: number | undefined = seqByVersion[versionId];
-			if (seq === undefined) {
+			const sequenceNumbers = seqByVersion[versionId];
+			if (sequenceNumbers === undefined) {
 				throw new Error(`no sequence number configured for version ${versionId}`);
 			}
-			return seq;
+			return typeof sequenceNumbers === "number"
+				? { sequenceNumber: sequenceNumbers }
+				: sequenceNumbers;
 		},
 		listCalls: () => listCallCount,
 		resolvedIds: () => [...resolved],
@@ -139,14 +144,14 @@ describe("OdspVersionManager", () => {
 	});
 
 	describe("efficiency: does it avoid unnecessary work?", () => {
-		it("stops resolving once it finds the closest base (does not resolve older versions)", async () => {
+		it("resolves all candidates because version label order does not define sequence order", async () => {
 			// @q M-STOP-01
 			const versions = [ref("tip"), ref("42.0"), ref("40.0")];
 			const seqs = { tip: 460, "42.0": 448, "40.0": 418 };
 			const { manager, fetcher } = makeManager(versions, seqs);
-			// target 448 matches 42.0, so 40.0 should never be resolved.
+			// A restore can make an older label have a newer sequence number, so all candidates are needed.
 			await manager.findBaseForSeq(448);
-			assert.deepEqual(fetcher.resolvedIds(), ["42.0"]);
+			assert.deepEqual(fetcher.resolvedIds(), ["42.0", "40.0"]);
 		});
 
 		it("caches the version list and resolved sequence numbers across calls", async () => {
@@ -176,6 +181,24 @@ describe("OdspVersionManager", () => {
 		});
 	});
 
+	describe("findVersionInRange", () => {
+		it("selects the highest sequence number rather than relying on version enumeration order", async () => {
+			// @q M-RANGE-01
+			const versions = [ref("tip"), ref("restored"), ref("older")];
+			const seqs = { tip: 20, restored: 15, older: 18 };
+			const { manager } = makeManager(versions, seqs);
+			const result = await manager.findVersionInRange(13, 20);
+			assert.equal(result?.versionId, "older");
+			assert.equal(result?.sequenceNumber, 18);
+		});
+
+		it("returns undefined when no retained snapshot can replace a gap", async () => {
+			// @q M-RANGE-02
+			const { manager } = makeManager([ref("tip"), ref("older")], { tip: 20, older: 12 });
+			assert.equal(await manager.findVersionInRange(13, 20), undefined);
+		});
+	});
+
 	describe("error handling", () => {
 		it("propagates (does not swallow) a failure to resolve a version's sequence number", async () => {
 			// @q M-ERR-01
@@ -202,6 +225,17 @@ describe("OdspVersionManager", () => {
 					["40.0", 418],
 				],
 			);
+		});
+
+		it("preserves a version's minimum sequence number", async () => {
+			// @q M-LIST-02
+			const { manager } = makeManager([ref("tip"), ref("42.0")], {
+				tip: 460,
+				"42.0": { sequenceNumber: 448, minimumSequenceNumber: 400 },
+			});
+			const resolved = await manager.listVersions();
+			assert.equal(resolved[0].minimumSequenceNumber, undefined);
+			assert.equal(resolved[1].minimumSequenceNumber, 400);
 		});
 	});
 });

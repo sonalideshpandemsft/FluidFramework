@@ -730,7 +730,11 @@ export interface IContainerLoadMode {
 		 * WARNING: This is the only option that may result in unbound wait. If machine is offline or hits some other
 		 * errors (like 429s), it may get into inifinite retry loop, with no ability to observe or cancel that process.
 		 */
-		| "all";
+		| "all"
+		/*
+		 * Apply operations until LoaderHeader.sequenceNumber is reached before returning.
+		 */
+		| "sequenceNumber";
 
 	deltaConnection?: /*
 	 * Connection to delta stream is made only when Container.connect() call is made. Op processing

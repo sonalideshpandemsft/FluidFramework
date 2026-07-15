@@ -1653,10 +1653,11 @@ export class Container
 				break;
 			}
 			case "cached":
-			case "all": {
+			case "all":
+			case "sequenceNumber": {
 				opsBeforeReturnP = this.attachDeltaManagerOpHandler(
 					attributes,
-					loadMode.opsBeforeReturn,
+					loadMode.opsBeforeReturn === "sequenceNumber" ? "all" : loadMode.opsBeforeReturn,
 					lastProcessedSequenceNumber,
 				);
 				break;

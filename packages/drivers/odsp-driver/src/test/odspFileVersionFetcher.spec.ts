@@ -86,12 +86,37 @@ describe("OdspFileVersionFetcher (integration, stubbed fetch)", () => {
 
 	const jsonHeaders = { "content-type": "application/json" };
 
-	/** A minimal but parser-valid ODSP JSON snapshot carrying the given sequence number. */
-	function snapshotWithSeq(sequenceNumber: number): IOdspSnapshot {
+	/** A minimal but parser-valid ODSP JSON snapshot carrying protocol attributes. */
+	function snapshotWithSeq(
+		sequenceNumber: number,
+		minimumSequenceNumber?: number,
+	): IOdspSnapshot {
+		const attributesId = "attributes";
 		return {
 			id: "id",
-			trees: [{ entries: [{ path: "path", type: "tree" }], id: "id", sequenceNumber }],
-			blobs: [],
+			trees: [
+				{
+					entries: [
+						{ path: ".protocol", type: "tree" },
+						{ path: ".protocol/attributes", type: "blob", id: attributesId },
+					],
+					id: "id",
+					sequenceNumber,
+				},
+			],
+			blobs:
+				minimumSequenceNumber === undefined
+					? []
+					: [
+							{
+								id: attributesId,
+								content: Buffer.from(JSON.stringify({ minimumSequenceNumber })).toString(
+									"base64",
+								),
+								encoding: "base64",
+								size: 0,
+							},
+						],
 		};
 	}
 
@@ -133,6 +158,34 @@ describe("OdspFileVersionFetcher (integration, stubbed fetch)", () => {
 		);
 	});
 
+	it("listFileVersions follows @odata.nextLink pages", async () => {
+		// @q F-LIST-02
+		const nextLink = `https://microsoft.sharepoint.com/_api/v2.1/drives/${driveId}/items/${itemId}/versions?$skiptoken=page2`;
+		const { result, urls } = await withFetch(
+			[
+				await createResponse(
+					jsonHeaders,
+					{
+						value: [{ id: "42.0", lastModifiedDateTime: "2026-01-02T00:00:00Z", size: 111 }],
+						"@odata.nextLink": nextLink,
+					},
+					200,
+				),
+				await createResponse(
+					jsonHeaders,
+					{ value: [{ id: "40.0", lastModifiedDateTime: "2026-01-01T00:00:00Z", size: 222 }] },
+					200,
+				),
+			],
+			async () => fetcher.listFileVersions(),
+		);
+		assert.deepEqual(
+			result.map((version) => version.versionId),
+			["42.0", "40.0"],
+		);
+		assert.equal(urls[1], nextLink);
+	});
+
 	it("resolveSequenceNumber reads trees[0].sequenceNumber and calls the versioned snapshot URL", async () => {
 		// @q F-RESOLVE-01
 		const { result, urls } = await withFetch(
@@ -140,11 +193,20 @@ describe("OdspFileVersionFetcher (integration, stubbed fetch)", () => {
 			async () => fetcher.resolveSequenceNumber("42.0"),
 		);
 
-		assert.equal(result, 448);
+		assert.deepEqual(result, { sequenceNumber: 448 });
 		assert.ok(
 			urls[0]?.includes(`/versions/42.0/opStream/snapshots/trees/latest?blobs=2`),
 			`expected the fileVersion snapshot URL, got ${urls[0]}`,
 		);
+	});
+
+	it("resolveSequenceNumber reads minimumSequenceNumber from protocol attributes", async () => {
+		// @q F-RESOLVE-03
+		const { result } = await withFetch(
+			[await createResponse(jsonHeaders, snapshotWithSeq(448, 400), 200)],
+			async () => fetcher.resolveSequenceNumber("42.0"),
+		);
+		assert.deepEqual(result, { sequenceNumber: 448, minimumSequenceNumber: 400 });
 	});
 
 	it("resolveSequenceNumber throws (does not return a wrong value) when the snapshot has no sequence number", async () => {

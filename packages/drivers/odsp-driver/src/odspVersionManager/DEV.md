@@ -79,8 +79,9 @@ so the parser has everything it needs.
 ### What is `minimumSequenceNumber`, and is it used for selection?
 
 It is the collaboration-window floor at a version (the point below which ops may be trimmed). It is
-carried on `ResolvedVersion` when read, but it is **not** an input to base selection — a version is a
-single point at its `sequenceNumber`, not a range.
+read from the version snapshot's `.protocol/attributes` blob and carried on `ResolvedVersion`, but it
+is **not** an input to base selection — a version is a single point at its `sequenceNumber`, not a
+range.
 
 ### What is deliberately not built here?
 
@@ -114,8 +115,9 @@ remaining versions, the answer is the greatest sequence number less than or equa
 
 ### What work does it avoid?
 
-- **Resolving more versions than needed?** It stops at the first version at or before the target and
-  does not resolve older ones. `M-STOP-01`
+- **Assuming version labels imply sequence-number order?** It resolves every retained candidate and
+  chooses by sequence number. This handles a restore that makes an old version label the new head.
+  `M-STOP-01`
 - **Re-fetching across calls?** The version list and each resolved sequence number are cached.
   `M-CACHE-01`
 - **Stale caches?** `refresh()` drops them so the next query re-enumerates. `M-CACHE-02`
@@ -128,6 +130,17 @@ The failure propagates; it is never swallowed into a wrong base. `M-ERR-01`
 
 Every version with its resolved sequence number, newest-first. `M-LIST-01`
 
+- **Does it preserve the collaboration-window floor?** Yes, when the snapshot has protocol attributes,
+  their `minimumSequenceNumber` is included. `M-LIST-02`
+
+### How does `findVersionInRange` choose a gap-recovery candidate?
+
+It returns the version with the greatest sequence number in `(minS, maxS]`, not the first matching
+version label. This keeps selection correct when version label order and sequence-number order differ.
+
+- **Multiple candidates in range?** Choose the greatest sequence number. `M-RANGE-01`
+- **No candidate in range?** Return `undefined`. `M-RANGE-02`
+
 ## Part III — The File-Version Fetcher
 
 `createOdspFileVersionFetcher` is the real `IOdspFileVersionFetcher`, talking to ODSP. Its behaviors
@@ -139,22 +152,26 @@ authentication, and snapshot-parsing code.
 It calls the driveItem versions URL — built from the same API root as the snapshot call — and maps
 the `value` array to versions (newest-first). `F-LIST-01`
 
+- **More than one result page?** It follows `@odata.nextLink` and appends every page. `F-LIST-02`
+
 ### How does it resolve a version's sequence number?
 
 - **A well-formed snapshot?** It calls the version-scoped snapshot URL (`.../versions/{label}/opStream/snapshots/trees/latest?blobs=2`),
   parses the response, and returns `trees[0].sequenceNumber`. `F-RESOLVE-01`
 - **A snapshot with no sequence number?** It throws, naming the version, rather than returning a wrong
   value. `F-RESOLVE-02`
+- **A snapshot with protocol attributes?** It returns their `minimumSequenceNumber` alongside the
+  snapshot sequence number. `F-RESOLVE-03`
 
 ## Part IV — Directional
 
 Aspirational behaviors, written as questions that cannot yet be answered "yes".
 
-### Should sequence-number resolution be lazy or binary-search, rather than eager?
+### Can sequence-number resolution be made more efficient?
 
-Resolving each version costs one snapshot fetch. With up to ~50 versions, an eager newest-to-oldest
-scan can fetch more than necessary. The public contract (`findBaseForSeq`) already hides the strategy,
-so a binary search over versions could replace it without changing callers.
+Resolving each version costs one snapshot fetch. Because version labels do not reliably order sequence
+numbers after a restore, the current manager resolves all retained candidates before selecting. A future
+server-provided sequence-number index could avoid those requests without weakening correctness.
 
 ### Should there be a component that loads the base and replays ops to the exact target? (Component B)
 

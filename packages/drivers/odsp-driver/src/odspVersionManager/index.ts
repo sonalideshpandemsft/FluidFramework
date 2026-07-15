@@ -7,11 +7,13 @@ export {
 	OdspVersionManager,
 	type BaseForSeq,
 	type IOdspVersionManager,
+	type IResolvedVersionSequenceNumbers,
 	type OdspFileVersionRef,
 	type IOdspFileVersionFetcher,
 	type ResolvedVersion,
 } from "./odspVersionManager.js";
 export {
 	createOdspFileVersionFetcher,
+	getVersionSnapshotUrl,
 	type OdspFileVersionFetcherProps,
 } from "./odspFileVersionFetcher.js";

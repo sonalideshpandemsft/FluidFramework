@@ -43,6 +43,12 @@ export interface ResolvedVersion extends OdspFileVersionRef {
 	readonly minimumSequenceNumber?: number;
 }
 
+/** The protocol sequence values read from a version-scoped snapshot. */
+export interface IResolvedVersionSequenceNumbers {
+	readonly sequenceNumber: number;
+	readonly minimumSequenceNumber?: number;
+}
+
 /**
  * Result of resolving the base version for a target sequence number.
  *
@@ -77,7 +83,7 @@ export interface IOdspFileVersionFetcher {
 	 * Resolve a single version's Fluid sequence number. Throws on failure rather than returning a
 	 * wrong value.
 	 */
-	resolveSequenceNumber(versionId: string): Promise<number>;
+	resolveSequenceNumber(versionId: string): Promise<IResolvedVersionSequenceNumbers>;
 }
 
 /**
@@ -89,6 +95,8 @@ export interface IOdspVersionManager {
 	 * `noBaseVersion` if the target predates the oldest retained version.
 	 */
 	findBaseForSeq(target: number): Promise<BaseForSeq>;
+	/** Find the newest retained version whose sequence is in `(minS, maxS]`. */
+	findVersionInRange(minS: number, maxS: number): Promise<ResolvedVersion | undefined>;
 	/**
 	 * Return every version with its resolved sequence number, newest-first.
 	 */
@@ -106,13 +114,16 @@ export interface IOdspVersionManager {
  */
 export class OdspVersionManager implements IOdspVersionManager {
 	private versionsCache: OdspFileVersionRef[] | undefined;
-	private readonly seqByVersion = new Map<string, number>();
+	private readonly sequenceNumbersByVersion = new Map<
+		string,
+		IResolvedVersionSequenceNumbers
+	>();
 
 	public constructor(private readonly fetcher: IOdspFileVersionFetcher) {}
 
 	public refresh(): void {
 		this.versionsCache = undefined;
-		this.seqByVersion.clear();
+		this.sequenceNumbersByVersion.clear();
 	}
 
 	public async findBaseForSeq(target: number): Promise<BaseForSeq> {
@@ -120,26 +131,53 @@ export class OdspVersionManager implements IOdspVersionManager {
 		const versions = await this.getVersions();
 		const candidates = versions.slice(1);
 
-		// The list is newest-first (descending sequence number), so the first candidate whose seq is
-		// at or before the target is the greatest seq <= target — that is the closest base. Scanning
-		// this way also yields the newest of any versions that share a sequence number (dedup), and
-		// avoids resolving older versions than necessary.
+		// Version labels are chronological but sequence numbers are not: restoring an old version makes
+		// it the new head on a new timeline. Resolve every retained candidate before comparing them.
 		let oldestResolvedSeq: number | undefined;
+		let closest: ResolvedVersion | undefined;
 		for (const version of candidates) {
-			const sequenceNumber = await this.resolveSeq(version.versionId);
-			oldestResolvedSeq = sequenceNumber;
-			if (sequenceNumber <= target) {
-				return { kind: "found", base: { ...version, sequenceNumber } };
+			const sequenceNumbers = await this.resolveSeq(version.versionId);
+			oldestResolvedSeq =
+				oldestResolvedSeq === undefined
+					? sequenceNumbers.sequenceNumber
+					: Math.min(oldestResolvedSeq, sequenceNumbers.sequenceNumber);
+			if (
+				sequenceNumbers.sequenceNumber <= target &&
+				(closest === undefined || sequenceNumbers.sequenceNumber > closest.sequenceNumber)
+			) {
+				closest = { ...version, ...sequenceNumbers };
 			}
 		}
-		return { kind: "noBaseVersion", oldestResolvedSeq };
+		return closest === undefined
+			? { kind: "noBaseVersion", oldestResolvedSeq }
+			: { kind: "found", base: closest };
+	}
+
+	public async findVersionInRange(
+		minS: number,
+		maxS: number,
+	): Promise<ResolvedVersion | undefined> {
+		const candidates = (await this.getVersions()).slice(1);
+		let newestInRange: ResolvedVersion | undefined;
+		for (const version of candidates) {
+			const sequenceNumbers = await this.resolveSeq(version.versionId);
+			if (
+				sequenceNumbers.sequenceNumber > minS &&
+				sequenceNumbers.sequenceNumber <= maxS &&
+				(newestInRange === undefined ||
+					sequenceNumbers.sequenceNumber > newestInRange.sequenceNumber)
+			) {
+				newestInRange = { ...version, ...sequenceNumbers };
+			}
+		}
+		return newestInRange;
 	}
 
 	public async listVersions(): Promise<ResolvedVersion[]> {
 		const versions = await this.getVersions();
 		const resolved: ResolvedVersion[] = [];
 		for (const version of versions) {
-			resolved.push({ ...version, sequenceNumber: await this.resolveSeq(version.versionId) });
+			resolved.push({ ...version, ...(await this.resolveSeq(version.versionId)) });
 		}
 		return resolved;
 	}
@@ -149,13 +187,13 @@ export class OdspVersionManager implements IOdspVersionManager {
 		return this.versionsCache;
 	}
 
-	private async resolveSeq(versionId: string): Promise<number> {
-		const cached = this.seqByVersion.get(versionId);
+	private async resolveSeq(versionId: string): Promise<IResolvedVersionSequenceNumbers> {
+		const cached = this.sequenceNumbersByVersion.get(versionId);
 		if (cached !== undefined) {
 			return cached;
 		}
-		const sequenceNumber = await this.fetcher.resolveSequenceNumber(versionId);
-		this.seqByVersion.set(versionId, sequenceNumber);
-		return sequenceNumber;
+		const sequenceNumbers = await this.fetcher.resolveSequenceNumber(versionId);
+		this.sequenceNumbersByVersion.set(versionId, sequenceNumbers);
+		return sequenceNumbers;
 	}
 }
