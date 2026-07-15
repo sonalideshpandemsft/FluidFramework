@@ -8,7 +8,15 @@ import type {
 	IContainerLoadMode,
 } from "@fluidframework/container-definitions/internal";
 import { LoaderHeader } from "@fluidframework/container-definitions/internal";
-import type { IRequest, IRequestHeader } from "@fluidframework/core-interfaces";
+import type {
+	IRequest,
+	IRequestHeader,
+	ITelemetryBaseLogger,
+} from "@fluidframework/core-interfaces";
+import type {
+	IDocumentStorageService,
+	IResolvedUrl,
+} from "@fluidframework/driver-definitions/internal";
 
 import {
 	loadExistingContainer,
@@ -33,6 +41,37 @@ export interface ILoadContainerToSequenceNumberProps
 	 */
 	readonly loadToSequenceNumber: number;
 }
+
+/**
+ * Structured result for point-in-time materialization availability checks.
+ * @legacy @alpha
+ */
+export type PointInTimeMaterializationAvailability =
+	| {
+			readonly canMaterialize: true;
+	  }
+	| {
+			readonly canMaterialize: false;
+			readonly reason:
+				| "unsupportedByDriver"
+				| "targetUnavailable"
+				| "requestNotResolvable"
+				| "error";
+			readonly message?: string;
+			readonly details?: Record<string, string | number | boolean | undefined>;
+	  };
+
+/**
+ * Props used to check if a target can be materialized at point in time.
+ * @legacy @alpha
+ */
+export type ICanMaterializePointInTimeProps = IContainerDriverServices & {
+	readonly request: IRequest;
+	readonly target: {
+		readonly sequenceNumber: number;
+	};
+	readonly logger?: ITelemetryBaseLogger;
+};
 
 function addLoadToSequenceNumberHeaders(
 	request: IRequest,
@@ -71,4 +110,70 @@ export async function loadContainerToSequenceNumber(
 		loadContainerToSequenceNumberProps.loadToSequenceNumber,
 	);
 	return loadExistingContainer({ ...loadContainerToSequenceNumberProps, request });
+}
+
+function isPointInTimeMaterializationCapable(
+	storageService: IDocumentStorageService,
+): storageService is IDocumentStorageService & {
+	canMaterializePointInTime: (
+		target: {
+			readonly sequenceNumber: number;
+		},
+	) => Promise<PointInTimeMaterializationAvailability>;
+} {
+	const candidate = storageService as Partial<{
+		canMaterializePointInTime: (
+			target: {
+				readonly sequenceNumber: number;
+			},
+		) => Promise<PointInTimeMaterializationAvailability>;
+	}>;
+	return typeof candidate.canMaterializePointInTime === "function";
+}
+
+/**
+ * Checks whether the current driver wiring can materialize the requested historical target.
+ * @legacy @alpha
+ */
+export async function canMaterializePointInTime(
+	props: ICanMaterializePointInTimeProps,
+): Promise<PointInTimeMaterializationAvailability> {
+	let documentService:
+		| Awaited<ReturnType<IContainerDriverServices["documentServiceFactory"]["createDocumentService"]>>
+		| undefined;
+	try {
+		const resolvedUrl: IResolvedUrl | undefined = await props.urlResolver.resolve(props.request);
+		if (resolvedUrl === undefined) {
+			return {
+				canMaterialize: false,
+				reason: "requestNotResolvable",
+				message: "Unable to resolve the request URL for point-in-time availability probing",
+			};
+		}
+
+		documentService = await props.documentServiceFactory.createDocumentService(
+			resolvedUrl,
+			props.logger,
+		);
+		const storageService = await documentService.connectToStorage();
+		if (!isPointInTimeMaterializationCapable(storageService)) {
+			return {
+				canMaterialize: false,
+				reason: "unsupportedByDriver",
+				message:
+					"Driver storage service does not expose canMaterializePointInTime capability",
+			};
+		}
+
+		return await storageService.canMaterializePointInTime(props.target);
+	} catch (error) {
+		const message = error instanceof Error ? error.message : "Unknown error";
+		return {
+			canMaterialize: false,
+			reason: "error",
+			message,
+		};
+	} finally {
+		documentService?.dispose?.();
+	}
 }

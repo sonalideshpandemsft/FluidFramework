@@ -25,8 +25,11 @@ export {
 	type ILoadFrozenContainerFromPendingStateProps,
 } from "./createAndLoadContainerUtils.js";
 export {
+	canMaterializePointInTime,
 	loadContainerToSequenceNumber,
+	type ICanMaterializePointInTimeProps,
 	type ILoadContainerToSequenceNumberProps,
+	type PointInTimeMaterializationAvailability,
 } from "./historicalContainerLoad.js";
 export type {
 	LoadSummarizerSummaryResult,

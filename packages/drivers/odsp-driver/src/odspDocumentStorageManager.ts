@@ -12,6 +12,7 @@ import {
 	FetchSource,
 	type ISnapshot,
 	type ISnapshotFetchOptions,
+	type ISnapshotFetchOptionsAlpha,
 	type ISummaryContext,
 	type ICreateBlobResponse,
 	type IVersion,
@@ -71,6 +72,10 @@ import {
 	useLegacyFlowWithoutGroupsForSnapshotFetch,
 	type TokenFetchOptionsEx,
 } from "./odspUtils.js";
+import {
+	createOdspFileVersionFetcher,
+	OdspVersionManager,
+} from "./odspVersionManager/index.js";
 import { pkgVersion as driverVersion } from "./packageVersion.js";
 
 export const defaultSummarizerCacheExpiryTimeout: number = 60 * 1000; // 60 seconds.
@@ -245,6 +250,24 @@ export class OdspDocumentStorageService extends OdspDocumentStorageServiceBase {
 	 * @param snapshotFetchOptions - fetch options for snapshot.
 	 */
 	public async getSnapshot(snapshotFetchOptions?: ISnapshotFetchOptions): Promise<ISnapshot> {
+		const historicalLoadOptions = snapshotFetchOptions as
+			| ISnapshotFetchOptionsAlpha
+			| undefined;
+		const loadToSequenceNumber = historicalLoadOptions?.loadToSequenceNumber;
+		if (
+			loadToSequenceNumber !== undefined &&
+			snapshotFetchOptions?.versionId === undefined
+		) {
+			const { snapshot } = await this.fetchHistoricalSnapshot(
+				loadToSequenceNumber,
+				snapshotFetchOptions?.scenarioName,
+			);
+			return {
+				...snapshot,
+				snapshotTree: this.combineProtocolAndAppSnapshotTree(snapshot.snapshotTree),
+			};
+		}
+
 		// Don't consult cache if request is not for a particular loading group.
 		const { snapshot } = await this.fetchSnapshot({
 			...snapshotFetchOptions,
@@ -258,6 +281,74 @@ export class OdspDocumentStorageService extends OdspDocumentStorageServiceBase {
 			...snapshot,
 			snapshotTree: this.combineProtocolAndAppSnapshotTree(snapshot.snapshotTree),
 		};
+	}
+
+	private async fetchHistoricalSnapshot(
+		loadToSequenceNumber: number,
+		scenarioName?: string,
+	): Promise<{ snapshot: ISnapshot; id: string | undefined }> {
+		this.checkSnapshotUrl();
+
+		const versionManager = new OdspVersionManager(
+			createOdspFileVersionFetcher({
+				urlParts: this.odspResolvedUrl,
+				getAuthHeader: this.getAuthHeader,
+				epochTracker: this.epochTracker,
+				logger: this.logger,
+			}),
+		);
+
+		const baseForSeq = await versionManager.findBaseForSeq(loadToSequenceNumber);
+		if (baseForSeq.kind !== "found") {
+			throw new NonRetryableError(
+				"No ODSP recoverable base version found for requested historical load sequence number",
+				OdspErrorTypes.genericError,
+				{
+					driverVersion,
+					loadToSequenceNumber,
+					oldestResolvedSeq: baseForSeq.oldestResolvedSeq,
+				},
+			);
+		}
+
+		const snapshot = await getWithRetryForTokenRefresh(async (options) => {
+			const snapshotDownloader = async (url: string): Promise<IOdspResponse<unknown>> => {
+				const method = "GET";
+				const authHeader = await this.getAuthHeader(
+					{ ...options, request: { url, method } },
+					"HistoricalGetSnapshot",
+				);
+				const headers = getHeadersWithAuth(authHeader);
+				return this.epochTracker.fetchAndParseAsJSON(
+					url,
+					{ headers, method },
+					"snapshotTree",
+					undefined,
+					scenarioName,
+				);
+			};
+
+			return fetchSnapshot(
+				this.snapshotUrl!,
+				baseForSeq.base.versionId,
+				true,
+				this.logger,
+				snapshotDownloader,
+			);
+		});
+
+		const id = this.initializeFromSnapshot(snapshot, this.firstSnapshotFetchCall, false);
+		this.firstSnapshotFetchCall = false;
+
+		this.logger.sendTelemetryEvent({
+			eventName: "HistoricalSnapshotResolved",
+			loadToSequenceNumber,
+			baseVersionId: baseForSeq.base.versionId,
+			baseSequenceNumber: baseForSeq.base.sequenceNumber,
+			snapshotSequenceNumber: snapshot.sequenceNumber,
+		});
+
+		return { snapshot, id };
 	}
 
 	private async fetchSnapshot(

@@ -595,8 +595,6 @@ export async function fetchISnapshot(
 		versionId: specifiedVersion,
 		loadToSequenceNumber,
 	};
-	// TODO: Historical loads should call into a version-manager-backed resolver (ODSP) that can
-	// map sequenceNumber/batchId targets to a concrete file version and stitched snapshot.
 	const snapshot = await storageAdapter.getSnapshot?.(snapshotFetchOptions);
 	const version: IVersion | undefined =
 		snapshot?.snapshotTree.id === undefined
