@@ -13,51 +13,11 @@ import {
 } from "../odspVersionManager/odspVersionManager.js";
 /* eslint-enable import-x/no-internal-modules */
 
-/**
- * Build an {@link OdspFileVersionRef} with the given label. Timestamp/size are irrelevant to the
- * manager's selection logic, so they are fixed.
- */
-function ref(versionId: string): OdspFileVersionRef {
-	return { versionId, lastModifiedDateTime: "2026-01-01T00:00:00.000Z" };
-}
+import { makeManager, ref } from "./odspVersionManagerTestFakes.js";
 
-interface FakeFetcher extends IOdspFileVersionFetcher {
-	/** Number of times the version list was fetched. */
-	readonly listCalls: () => number;
-	/** Version ids passed to resolveSequenceNumber, in call order. */
-	readonly resolvedIds: () => string[];
-}
-
-/*
- * Create a manager backed by in-memory fakes so the selection logic can be tested without ODSP.
- * `versions` is the newest-first list the fake `listFileVersions` returns; `seqByVersion` maps a
- * versionId to the sequence number the fake `resolveSequenceNumber` returns (a missing id makes it
- * throw, modelling a parse failure).
- */
-function makeManager(
-	versions: OdspFileVersionRef[],
-	seqByVersion: Record<string, number>,
-): { manager: OdspVersionManager; fetcher: FakeFetcher } {
-	let listCallCount = 0;
-	const resolved: string[] = [];
-	const fetcher: FakeFetcher = {
-		listFileVersions: async () => {
-			listCallCount++;
-			return versions;
-		},
-		resolveSequenceNumber: async (versionId: string) => {
-			resolved.push(versionId);
-			const seq: number | undefined = seqByVersion[versionId];
-			if (seq === undefined) {
-				throw new Error(`no sequence number configured for version ${versionId}`);
-			}
-			return seq;
-		},
-		listCalls: () => listCallCount,
-		resolvedIds: () => [...resolved],
-	};
-	return { manager: new OdspVersionManager(fetcher), fetcher };
-}
+// The lineage (epoch) and op-availability halves of `validateBaseForReplay` have dedicated suites:
+// see odspVersionManagerLineage.spec.ts and odspVersionManagerOpAvailability.spec.ts. This file
+// covers version selection (`findBaseForSeq`), caching, and `listVersions`.
 
 describe("OdspVersionManager", () => {
 	describe("findBaseForSeq: which version does it pick for a target sequence number?", () => {
@@ -192,6 +152,9 @@ describe("OdspVersionManager", () => {
 					return new Promise<OdspFileVersionRef[]>((resolve) => gates.push(resolve));
 				},
 				resolveSequenceNumber: async (versionId: string) => Number.parseInt(versionId, 10),
+				getLiveDocumentEpoch: async () => "epoch",
+				getRecoverableVersionEpoch: async () => "epoch",
+				fetchOps: async () => [],
 			};
 			const manager = new OdspVersionManager(fetcher);
 
