@@ -11,8 +11,11 @@
 
 // eslint-disable-next-line import-x/no-internal-modules -- Dedicated entrypoint for the optional point-in-time implementation.
 export { createPointInTimeDocumentService } from "./pointInTimeDriver/createPointInTimeDocumentService.js";
+export { createPointInTimeAvailabilityProvider } from "./pointInTimeDriver/createPointInTimeAvailabilityProvider.js";
 export type {
 	IOdspPointInTimeDocumentServiceImplementationProps,
+	OdspPointInTimeAvailabilityImplementation,
+	OdspPointInTimeAvailabilityImplementationProps,
 	OdspPointInTimeDocumentServiceImplementation,
 } from "./odspDocumentServiceFactoryCore.js";
 export type {

@@ -3,9 +3,15 @@
  * Licensed under the MIT License.
  */
 
+/* eslint-disable @typescript-eslint/consistent-type-assertions */
+
 import { strict as assert } from "node:assert";
 
-import type { ISnapshot, ISnapshotTree } from "@fluidframework/driver-definitions/internal";
+import type {
+	ISequencedDocumentMessage,
+	ISnapshot,
+	ISnapshotTree,
+} from "@fluidframework/driver-definitions/internal";
 import type {
 	IOdspResolvedUrl,
 	IOdspUrlParts,
@@ -90,11 +96,26 @@ describe("OdspFileVersionFetcher (integration, stubbed fetch)", () => {
 	const jsonHeaders = { "content-type": "application/json" };
 
 	/** A minimal but parser-valid ODSP JSON snapshot carrying the given sequence number. */
-	function snapshotWithSeq(sequenceNumber: number): IOdspSnapshot {
+	function snapshotWithSeq(
+		sequenceNumber: number,
+		latestSequenceNumber: number = sequenceNumber,
+	): IOdspSnapshot {
 		return {
 			id: "id",
 			trees: [{ entries: [{ path: "path", type: "tree" }], id: "id", sequenceNumber }],
 			blobs: [],
+			ops:
+				latestSequenceNumber === sequenceNumber
+					? []
+					: Array.from({ length: latestSequenceNumber - sequenceNumber }, (_value, index) => {
+							const opSequenceNumber = sequenceNumber + index + 1;
+							return {
+								sequenceNumber: opSequenceNumber,
+								op: {
+									sequenceNumber: opSequenceNumber,
+								} as ISequencedDocumentMessage,
+							};
+						}),
 		};
 	}
 
@@ -108,14 +129,17 @@ describe("OdspFileVersionFetcher (integration, stubbed fetch)", () => {
 	const msFluidHeaders = { "content-type": "application/ms-fluid" };
 
 	/** Serialize a minimal snapshot carrying `sequenceNumber` into the compact (ms-fluid) binary form. */
-	function compactSnapshotBytesWithSeq(sequenceNumber: number): Uint8Array {
+	function compactSnapshotBytesWithSeq(
+		sequenceNumber: number,
+		latestSequenceNumber: number = sequenceNumber,
+	): Uint8Array {
 		const snapshotTree: ISnapshotTree = { id: "id", blobs: {}, trees: {} };
 		const snapshot: ISnapshot = {
 			snapshotTree,
 			blobContents: new Map(),
 			ops: [],
 			sequenceNumber,
-			latestSequenceNumber: sequenceNumber,
+			latestSequenceNumber,
 			snapshotFormatV: 1,
 		};
 		return convertToCompactSnapshot(snapshot);
@@ -183,13 +207,19 @@ describe("OdspFileVersionFetcher (integration, stubbed fetch)", () => {
 		assert.equal(urls[1], nextLink, "the second request should target the nextLink URL");
 	});
 
-	it("returns an empty list when the response has no value field", async () => {
+	it("rejects a response with no versions array", async () => {
 		// @q F-LIST-03
-		const { result } = await withFetch(
-			[await createResponse(jsonHeaders, {}, 200)],
-			async () => fetcher.listFileVersions(),
+		await assert.rejects(
+			async () =>
+				withFetch(
+					[
+						await createResponse(jsonHeaders, {}, 200),
+						await createResponse(jsonHeaders, {}, 200),
+					],
+					async () => fetcher.listFileVersions(),
+				),
+			/missing its versions array/,
 		);
-		assert.deepEqual(result, [], "a missing value field is treated as an empty version list");
 	});
 
 	it("resolveSequenceNumber reads trees[0].sequenceNumber and calls the versioned snapshot URL", async () => {
@@ -204,6 +234,49 @@ describe("OdspFileVersionFetcher (integration, stubbed fetch)", () => {
 			urls[0]?.includes(`/versions/42.0/opStream/snapshots/trees/latest?blobs=2`),
 			`expected the fileVersion snapshot URL, got ${urls[0]}`,
 		);
+		assert(!urls[0]?.includes("deltas=1"));
+	});
+
+	it("resolveLiveLatestSequenceNumber reads a fresh unversioned snapshot head", async () => {
+		const { result, urls } = await withFetch(
+			[await createResponse(jsonHeaders, snapshotWithSeq(448, 455), 200)],
+			async () => fetcher.resolveLiveLatestSequenceNumber(),
+		);
+
+		assert.equal(result, 455);
+		assert.ok(
+			urls[0]?.includes(`/items/${itemId}/opStream/snapshots/trees/latest?blobs=2&deltas=1`),
+			`expected the unversioned live snapshot URL, got ${urls[0]}`,
+		);
+		assert(!urls[0]?.includes("/versions/"));
+	});
+
+	it("ignores bundled operation gaps when resolving base metadata", async () => {
+		const snapshotWithGap = snapshotWithSeq(448, 450);
+		snapshotWithGap.ops![0] = {
+			sequenceNumber: 450,
+			op: { sequenceNumber: 450 } as ISequencedDocumentMessage,
+		};
+
+		const { result, urls } = await withFetch(
+			[await createResponse(jsonHeaders, snapshotWithGap, 200)],
+			async () => fetcher.resolveVersionSequenceNumbers("42.0"),
+		);
+
+		assert.deepEqual(result, { sequenceNumber: 448, latestSequenceNumber: 448 });
+		assert(!urls[0]?.includes("deltas=1"));
+	});
+
+	it("does not treat compact lsn as a bundled operation tail", async () => {
+		const { result } = await withFetch(
+			[await createResponse(msFluidHeaders, compactSnapshotBytesWithSeq(448, 455), 200)],
+			async () => fetcher.resolveVersionSequenceNumbers("42.0"),
+		);
+
+		assert.deepEqual(result, {
+			sequenceNumber: 448,
+			latestSequenceNumber: 448,
+		});
 	});
 
 	it("resolveSequenceNumber throws (does not return a wrong value) when the snapshot has no sequence number", async () => {

@@ -743,11 +743,38 @@ export enum NackErrorType {
 }
 
 // @beta @legacy
+export interface PointInTimeAvailabilityOptions {
+    readonly signal?: AbortSignal | undefined;
+}
+
+// @beta @legacy
+export interface PointInTimeAvailabilityProvider {
+    checkSequenceNumberAvailability(sequenceNumbers: readonly number[], options?: PointInTimeAvailabilityOptions): Promise<readonly SequenceNumberAvailability[]>;
+}
+
+// @beta @legacy
 export enum ScopeType {
     DocRead = "doc:read",
     DocWrite = "doc:write",
     SummaryWrite = "summary:write"
 }
+
+// @beta @legacy
+export type SequenceNumberAvailability = {
+    readonly sequenceNumber: number;
+    readonly status: "available";
+} | {
+    readonly sequenceNumber: number;
+    readonly status: "unavailable";
+    readonly reason: SequenceNumberAvailabilityReason;
+} | {
+    readonly sequenceNumber: number;
+    readonly status: "unknown";
+    readonly reason: "transientFailure";
+};
+
+// @beta @legacy
+export type SequenceNumberAvailabilityReason = "noRetainedBase" | "missingBridgingOps" | "lineageMismatch" | "notMaterializationBoundary";
 
 // @public
 export type SummaryObject = ISummaryTree | ISummaryBlob | ISummaryHandle | ISummaryAttachment;

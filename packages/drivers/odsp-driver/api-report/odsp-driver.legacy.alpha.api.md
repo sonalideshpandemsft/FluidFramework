@@ -97,6 +97,7 @@ export interface IOdspDocumentServiceFactoryOptions {
     readonly getWebsocketToken: TokenFetcher<OdspResourceTokenFetchOptions> | undefined;
     readonly hostPolicy?: HostStoragePolicy | undefined;
     readonly persistedCache?: IPersistedCache | undefined;
+    readonly pointInTimeAvailabilityImplementation?: OdspPointInTimeAvailabilityImplementation | undefined;
     readonly pointInTimeDocumentServiceImplementation?: OdspPointInTimeDocumentServiceImplementation | undefined;
 }
 
@@ -185,6 +186,7 @@ export class OdspDocumentServiceFactoryCore implements IDocumentServiceFactory, 
     createDocumentService(resolvedUrl: IResolvedUrl, logger?: ITelemetryBaseLogger, clientIsSummarizer?: boolean): Promise<IDocumentService>;
     // (undocumented)
     protected createDocumentServiceCore(resolvedUrl: IResolvedUrl, odspLogger: ITelemetryBaseLogger, cacheAndTrackerArg?: ICacheAndTracker, clientIsSummarizer?: boolean): Promise<IDocumentService>;
+    readonly createPointInTimeAvailabilityProvider?: PointInTimeAvailabilityDocumentServiceFactory["createPointInTimeAvailabilityProvider"];
     readonly createPointInTimeDocumentService?: IPointInTimeDocumentServiceFactory["createPointInTimeDocumentService"];
     getRelayServiceSessionInfo(resolvedUrl: IResolvedUrl): Promise<ISocketStorageDiscovery | undefined>;
     readonly ILayerCompatDetails?: unknown;
@@ -231,7 +233,26 @@ export interface OdspFluidDataStoreLocator extends IOdspUrlParts {
 }
 
 // @beta @legacy
+export type OdspPointInTimeAvailabilityImplementation = (props: OdspPointInTimeAvailabilityImplementationProps) => Promise<PointInTimeAvailabilityProvider>;
+
+// @beta @legacy
+export interface OdspPointInTimeAvailabilityImplementationProps {
+    readonly clientIsSummarizer?: boolean | undefined;
+    readonly createDocumentService: IOdspPointInTimeDocumentServiceImplementationProps["createDocumentService"];
+    readonly getStorageToken: TokenFetcher<OdspResourceTokenFetchOptions>;
+    readonly logger?: ITelemetryBaseLogger | undefined;
+    readonly persistedCache: IPersistedCache;
+    readonly requestHeaders?: Readonly<Record<string, string>> | undefined;
+    readonly resolvedUrl: IResolvedUrl;
+}
+
+// @beta @legacy
 export type OdspPointInTimeDocumentServiceImplementation = (props: IOdspPointInTimeDocumentServiceImplementationProps) => Promise<IDocumentService>;
+
+// @beta @legacy
+export interface PointInTimeAvailabilityDocumentServiceFactory extends IDocumentServiceFactory {
+    createPointInTimeAvailabilityProvider(resolvedUrl: IResolvedUrl, logger?: ITelemetryBaseLogger, clientIsSummarizer?: boolean): Promise<PointInTimeAvailabilityProvider>;
+}
 
 // @beta @legacy
 export function prefetchLatestSnapshot(resolvedUrl: IResolvedUrl, getStorageToken: TokenFetcher<OdspResourceTokenFetchOptions>, persistedCache: IPersistedCache, _forceAccessTokenViaAuthorizationHeader: boolean, logger: ITelemetryBaseLogger, hostSnapshotFetchOptions: ISnapshotOptions | undefined, enableRedeemFallback?: boolean, _fetchBinarySnapshotFormat?: boolean, _snapshotFormatFetchType?: SnapshotFormatSupportType, odspDocumentServiceFactory?: OdspDocumentServiceFactory): Promise<boolean>;

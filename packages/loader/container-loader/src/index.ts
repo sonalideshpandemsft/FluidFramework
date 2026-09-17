@@ -49,6 +49,16 @@ export {
 	type ILoadContainerToSequenceNumberProps,
 } from "./loadContainerToSequenceNumber.js";
 export {
+	checkSequenceNumberAvailability,
+	type CheckSequenceNumberAvailabilityProps,
+} from "./checkSequenceNumberAvailability.js";
+export type {
+	PointInTimeAvailabilityOptions,
+	PointInTimeAvailabilityProvider,
+	SequenceNumberAvailability,
+	SequenceNumberAvailabilityReason,
+} from "@fluidframework/driver-definitions/legacy";
+export {
 	isLocationRedirectionError,
 	resolveWithLocationRedirectionHandling,
 } from "./location-redirection-utilities/index.js";

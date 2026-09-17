@@ -17,8 +17,10 @@ import type {
 import { LocalOdspDocumentServiceFactory } from "./localOdspDriver/localOdspDocumentServiceFactory.js";
 import {
 	type IPointInTimeDocumentServiceFactory,
+	type OdspPointInTimeAvailabilityImplementation,
 	type OdspPointInTimeDocumentServiceImplementation,
 	OdspDocumentServiceFactoryCore,
+	type PointInTimeAvailabilityDocumentServiceFactory,
 } from "./odspDocumentServiceFactoryCore.js";
 import { LocalPersistentCache } from "./odspCache.js";
 
@@ -42,6 +44,10 @@ export interface IOdspDocumentServiceFactoryOptions {
 	 */
 	readonly pointInTimeDocumentServiceImplementation?:
 		| OdspPointInTimeDocumentServiceImplementation
+		| undefined;
+	/** Enables batched point-in-time availability checks. */
+	readonly pointInTimeAvailabilityImplementation?:
+		| OdspPointInTimeAvailabilityImplementation
 		| undefined;
 }
 
@@ -75,6 +81,7 @@ export function createOdspDocumentServiceFactory(
 ): OdspDocumentServiceFactory {
 	const persistedCache = options.persistedCache ?? new LocalPersistentCache();
 	const pointInTimeImplementation = options.pointInTimeDocumentServiceImplementation;
+	const pointInTimeAvailabilityImplementation = options.pointInTimeAvailabilityImplementation;
 
 	class ConfiguredOdspDocumentServiceFactory extends OdspDocumentServiceFactory {
 		public override readonly createPointInTimeDocumentService:
@@ -86,6 +93,23 @@ export function createOdspDocumentServiceFactory(
 						pointInTimeImplementation({
 							resolvedUrl,
 							targetSequenceNumber,
+							logger,
+							clientIsSummarizer,
+							persistedCache,
+							getStorageToken: options.getStorageToken,
+							requestHeaders: this.requestHeaders,
+							createDocumentService: async (url, odspLogger, cacheAndTracker, isSummarizer) =>
+								this.createDocumentServiceCore(url, odspLogger, cacheAndTracker, isSummarizer),
+						});
+
+		public override readonly createPointInTimeAvailabilityProvider:
+			| PointInTimeAvailabilityDocumentServiceFactory["createPointInTimeAvailabilityProvider"]
+			| undefined =
+			pointInTimeAvailabilityImplementation === undefined
+				? undefined
+				: async (resolvedUrl, logger, clientIsSummarizer) =>
+						pointInTimeAvailabilityImplementation({
+							resolvedUrl,
 							logger,
 							clientIsSummarizer,
 							persistedCache,

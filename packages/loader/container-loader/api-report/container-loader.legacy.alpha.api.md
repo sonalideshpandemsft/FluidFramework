@@ -10,6 +10,16 @@ export function asLegacyAlpha(base: IContainer): ContainerAlpha;
 // @alpha @legacy
 export function captureFullContainerState(input: ICaptureFullContainerStateProps): Promise<string>;
 
+// @beta @legacy
+export function checkSequenceNumberAvailability(props: CheckSequenceNumberAvailabilityProps): Promise<readonly SequenceNumberAvailability[]>;
+
+// @beta @legacy
+export interface CheckSequenceNumberAvailabilityProps extends IContainerLoadDriverProps {
+    readonly logger?: ITelemetryBaseLogger | undefined;
+    readonly sequenceNumbers: readonly number[];
+    readonly signal?: AbortSignal | undefined;
+}
+
 // @public
 export enum ConnectionState {
     CatchingUp = 1,
@@ -253,6 +263,16 @@ export class PendingLocalStateStore<TKey> {
 }
 
 // @beta @legacy
+export interface PointInTimeAvailabilityOptions {
+    readonly signal?: AbortSignal | undefined;
+}
+
+// @beta @legacy
+export interface PointInTimeAvailabilityProvider {
+    checkSequenceNumberAvailability(sequenceNumbers: readonly number[], options?: PointInTimeAvailabilityOptions): Promise<readonly SequenceNumberAvailability[]>;
+}
+
+// @beta @legacy
 export type ProtocolHandlerBuilder = (attributes: IDocumentAttributes, snapshot: IQuorumSnapshot, sendProposal: (key: string, value: any) => number) => IProtocolHandler;
 
 // @beta @legacy
@@ -269,6 +289,23 @@ export function rehydrateDetachedContainer(rehydrateDetachedContainerProps: IReh
 
 // @beta @legacy
 export function resolveWithLocationRedirectionHandling<T>(api: (request: IRequest) => Promise<T>, request: IRequest, urlResolver: IUrlResolver, logger?: ITelemetryBaseLogger): Promise<T>;
+
+// @beta @legacy
+export type SequenceNumberAvailability = {
+    readonly sequenceNumber: number;
+    readonly status: "available";
+} | {
+    readonly sequenceNumber: number;
+    readonly status: "unavailable";
+    readonly reason: SequenceNumberAvailabilityReason;
+} | {
+    readonly sequenceNumber: number;
+    readonly status: "unknown";
+    readonly reason: "transientFailure";
+};
+
+// @beta @legacy
+export type SequenceNumberAvailabilityReason = "noRetainedBase" | "missingBridgingOps" | "lineageMismatch" | "notMaterializationBoundary";
 
 // @alpha @legacy
 export type SummaryStage = "base" | "generate" | "upload" | "submit" | "unknown";
