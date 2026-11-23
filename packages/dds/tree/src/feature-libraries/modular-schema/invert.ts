@@ -99,6 +99,7 @@ export function invertModularChange(
 					},
 				],
 				revisionForInvert,
+				change.revision,
 			)
 		: [{ revision: revisionForInvert }];
 
@@ -123,6 +124,10 @@ export function invertModularChange(
 	if (change.change.maxId !== undefined) {
 		for (const { revision } of oldRevInfos) {
 			genId.reserve(revision, change.change.maxId);
+		}
+		// Compaction preserves move identities whose original revisions are no longer authored revisions.
+		for (const { start } of change.change.crossFieldKeys.entries()) {
+			genId.reserve(start.revision, change.change.maxId);
 		}
 	}
 
@@ -686,7 +691,15 @@ function invertBuilds(
 function getRevInfosForRollback(
 	revisions: readonly RevisionInfo[],
 	revisionForInvert: RevisionTag,
+	taggedRevision: RevisionTag | undefined,
 ): readonly RevisionInfo[] {
-	assert(hasSingle(revisions), 0xdad /* Can only roll back a single revision at a time */);
-	return [{ revision: revisionForInvert, rollbackOf: revisions[0].revision }];
+	if (hasSingle(revisions)) {
+		return [{ revision: revisionForInvert, rollbackOf: revisions[0].revision }];
+	}
+	// A compacted commit retains namespace ordering, but is rolled back as one graph commit.
+	assert(
+		taggedRevision !== undefined && revisions.at(-1)?.revision === taggedRevision,
+		"A composed rollback must be tagged with its newest revision",
+	);
+	return [{ revision: revisionForInvert, rollbackOf: taggedRevision }];
 }

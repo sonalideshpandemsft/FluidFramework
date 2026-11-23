@@ -23,7 +23,11 @@ import {
 	DependentFormatVersion,
 	FluidClientVersion,
 } from "../../codec/index.js";
-import { RevisionTagCodec } from "../../core/index.js";
+import {
+	RevisionTagCodec,
+	flattenCustomMetadata,
+	type CustomMetadataTree,
+} from "../../core/index.js";
 import { FormatValidatorBasic } from "../../external-utilities/index.js";
 import {
 	EditManagerFormatVersion,
@@ -48,7 +52,8 @@ import {
 	TreeViewConfiguration,
 	toInitialSchema,
 } from "../../simple-tree/index.js";
-import { testChangeFamilyFactory, type TestChange } from "../testChange.js";
+import { testChangeFamilyFactory, TestChange } from "../testChange.js";
+import { brand } from "../../util/index.js";
 import {
 	expectSchemaEqual,
 	SharedTreeTestFactory,
@@ -88,6 +93,87 @@ function createEditManagerSummarizer(options?: {
 }
 
 describe("EditManagerSummarizer", () => {
+	it("round-trips thousands of compacted metadata trees without flattening authored transactions", async () => {
+		const { summarizer, editManager } = createEditManagerSummarizer({
+			minVersionForCollab: FluidClientVersion.v2_117,
+		});
+		editManager.setHistoryRetention(true);
+		const metadata: CustomMetadataTree[] = [];
+		const count = 4000;
+		for (let index = 0; index < count; index++) {
+			const tree: CustomMetadataTree = {
+				metadata: undefined,
+				children: [{ metadata: { index, keep: true }, children: [] }],
+			};
+			metadata.push(tree);
+			editManager.addSequencedChanges(
+				[
+					{
+						change: TestChange.emptyChange,
+						revision: testIdCompressor.generateCompressedId(),
+						customMetadata: tree,
+					},
+				],
+				testIdCompressor.localSessionId,
+				brand(index + 1),
+				brand(index),
+				"main",
+			);
+		}
+		editManager.advanceMinimumSequenceNumber(brand(count));
+		assert.doesNotThrow(() => summarizer.summarize({ stringify: JSON.stringify }));
+
+		assert.equal(
+			editManager.compactHistory(() => true),
+			count - 1,
+		);
+
+		const survivor = editManager.getTrunkHead("main");
+		assert.deepEqual(survivor.customMetadata?.children, metadata);
+		assert.deepEqual(flattenCustomMetadata(survivor.customMetadata), {
+			index: count - 1,
+			keep: true,
+		});
+		const summary = summarizer.summarize({ stringify: JSON.stringify });
+		const loaded = createEditManagerSummarizer({
+			minVersionForCollab: FluidClientVersion.v2_117,
+		});
+		loaded.editManager.setHistoryRetention(true);
+		await loaded.summarizer.load(MockStorage.createFromSummary(summary.summary), JSON.parse);
+		assert.deepEqual(
+			loaded.editManager.getTrunkHead("main").customMetadata,
+			survivor.customMetadata,
+		);
+		assert.doesNotThrow(() => loaded.summarizer.summarize({ stringify: JSON.stringify }));
+		const loadedMetadata = loaded.editManager.getTrunkHead("main").customMetadata;
+		for (let index = 1; index <= 2; index++) {
+			loaded.editManager.addSequencedChanges(
+				[
+					{
+						change: TestChange.emptyChange,
+						revision: testIdCompressor.generateCompressedId(),
+						customMetadata: metadata[index],
+					},
+				],
+				testIdCompressor.localSessionId,
+				brand(count + index),
+				brand(count + index - 1),
+				"main",
+			);
+		}
+		loaded.editManager.advanceMinimumSequenceNumber(brand(count + 2));
+		assert.equal(
+			loaded.editManager.compactHistory(() => true),
+			2,
+		);
+		assert.deepEqual(loaded.editManager.getTrunkHead("main").customMetadata?.children, [
+			loadedMetadata,
+			metadata[1],
+			metadata[2],
+		]);
+		assert.doesNotThrow(() => loaded.summarizer.summarize({ stringify: JSON.stringify }));
+	});
+
 	// B's data edit uses a type added by an earlier schema commit.
 	// Both commits lose a rebase, but the summary still needs to preserve B's original history.
 	// Minimized from topLevel.fuzz.spec.ts, Batch rebasing seed 41.

@@ -461,6 +461,34 @@ const node1Chunk = chunkFromJsonTrees([1]);
 const nodesChunk = treeChunkFromCursor(fieldJsonCursor([{}, {}]));
 
 describe("ModularChangeFamily", () => {
+	describe("changeRevision", () => {
+		it("raises maxId when collapsing revisions allocates new local IDs", () => {
+			const change: ModularChangeset = {
+				...Change.empty(),
+				maxId: brand(0),
+				revisions: [{ revision: tag1 }, { revision: tag2 }],
+				builds: newChangeAtomIdBTree([
+					[[tag1 as RevisionTag | undefined, brand(0)], node1Chunk],
+					[[tag2, brand(0)], node1Chunk],
+				]),
+			};
+			deepFreeze(change);
+			const updated = family.changeRevision(
+				change,
+				new DefaultRevisionReplacer(tag3, new Set([tag1, tag2])),
+			);
+			assert.equal(updated.maxId, 1);
+			assert.deepEqual(
+				[...(updated.builds ?? assert.fail()).keys()],
+				[
+					[tag3, 0],
+					[tag3, 1],
+				],
+			);
+			assert.equal(change.maxId, 0);
+		});
+	});
+
 	describe("compose", () => {
 		const composedValues: ValueChangeset = { old: 0, new: 2 };
 
@@ -903,6 +931,21 @@ describe("ModularChangeFamily", () => {
 		const valueInverse1: ValueChangeset = { old: 1, new: 0 };
 		const valueInverse2: ValueChangeset = { old: 2, new: 1 };
 
+		it("rolls back a compacted commit under its surviving graph revision", () => {
+			const change: ModularChangeset = {
+				...rootChange1a,
+				revisions: [{ revision: tag1 }, { revision: tag2 }],
+			};
+			const rollback = family.invert(tagChange(change, tag2), true, tag3);
+			assert.deepEqual(rollback.revisions, [{ revision: tag3, rollbackOf: tag2 }]);
+			const singleRevisionRollback = family.invert(tagChange(rootChange1a, tag1), true, tag3);
+			assert.deepEqual(rollback.fieldChanges, singleRevisionRollback.fieldChanges);
+			assert.throws(
+				() => family.invert(makeAnonChange(change), true, tag3),
+				/A composed rollback must be tagged with its newest revision/,
+			);
+		});
+
 		it("specific", () => {
 			const revisionForInvert = mintRevisionTag();
 			const expectedInverse: ModularChangeset = {
@@ -1340,6 +1383,27 @@ describe("ModularChangeFamily", () => {
 		for (const version of family.codecs.getSupportedFormats()) {
 			describe(`revision metadata in version ${version}`, () => {
 				const jsonCodec = family.codecs.resolve(version);
+
+				it("persists namespace ordering for a tagged compacted summary, but not an op", () => {
+					const revisions = [{ revision: tag1 }, { revision: tag2 }];
+					const change: ModularChangeset = { ...rootChange1a, revisions };
+					const summaryContext: ChangeEncodingContext = {
+						...context,
+						revision: tag2,
+						isSummary: true,
+					};
+					const encoded = jsonCodec.encode(change, summaryContext);
+					const decoded = jsonCodec.decode(encoded, summaryContext);
+					assert.deepEqual(decoded.revisions, revisions);
+					assertEquivalent(decoded, change);
+					assert.throws(() =>
+						jsonCodec.encode(change, { ...summaryContext, isSummary: false }),
+					);
+					assert.throws(
+						() => jsonCodec.encode(change, { ...summaryContext, revision: tag3 }),
+						/A compacted summary change must end with its tagged revision/,
+					);
+				});
 
 				it("maxId accounts for IDs allocated during decoding", () => {
 					const change = inlineRevision(rootChange1a, tag1);

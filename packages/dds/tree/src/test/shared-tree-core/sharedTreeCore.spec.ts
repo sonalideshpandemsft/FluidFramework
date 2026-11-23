@@ -78,7 +78,12 @@ import {
 	TestTreeProviderLite,
 } from "../utils.js";
 
-import { createTree, createTreeSharedObject, TestSharedTreeCore } from "./utils.js";
+import {
+	createTree,
+	createTreeSharedObject,
+	TestSharedTreeCore,
+	testCodecOptions,
+} from "./utils.js";
 
 const enableSchemaValidation = true;
 
@@ -215,6 +220,7 @@ describe("SharedTreeCore", () => {
 		it("writes metadata blob with version 2", async () => {
 			const tree = createTree({
 				indexes: [],
+				codecOptions: { ...testCodecOptions, minVersionForCollab: "2.117.0" },
 			});
 			const { summary } = tree.summarizeCore(mockSerializer);
 			const metadataBlob: SummaryObject | undefined = summary.tree[summarizablesMetadataKey];
@@ -233,6 +239,7 @@ describe("SharedTreeCore", () => {
 		it("loads with metadata blob with version 2", async () => {
 			const tree = createTree({
 				indexes: [],
+				codecOptions: { ...testCodecOptions, minVersionForCollab: "2.117.0" },
 			});
 			const { summary } = tree.summarizeCore(mockSerializer);
 			const metadataBlob: SummaryObject | undefined = summary.tree[summarizablesMetadataKey];

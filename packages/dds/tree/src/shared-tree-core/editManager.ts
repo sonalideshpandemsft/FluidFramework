@@ -18,11 +18,13 @@ import {
 	type ChangeFamily,
 	type ChangeFamilyEditor,
 	CommitKind,
+	type CustomMetadataTree,
 	type GraphCommit,
 	type RevisionTag,
 	findAncestor,
 	findCommonAncestor,
 	mintCommit,
+	replaceChangeInPlace,
 	type RebaseStatsWithDuration,
 	tagChange,
 } from "../core/index.js";
@@ -49,6 +51,7 @@ import {
 	minSequenceId,
 	sequenceIdComparator,
 } from "./sequenceIdUtils.js";
+import { encodeCustomMetadataTree } from "./customMetadataCodec.js";
 
 export const minimumPossibleSequenceNumber: SeqNumber = brand(Number.MIN_SAFE_INTEGER);
 const minimumPossibleSequenceId: SequenceId = {
@@ -80,6 +83,14 @@ export class EditManager<
 > {
 	private readonly trimmer = createEmitter<BranchTrimmingEvents>();
 	private readonly trimState = { trimmedCommitCount: 0 };
+
+	/**
+	 * Pairs whose composition failed in this session, keyed by {@link compactionPairKey}.
+	 * @remarks
+	 * Session-local and not summarized: a new client retries the pair once, then remembers it.
+	 * Only populated when {@link HistoryCompactionEngineOptions.isolateFailures} is set.
+	 */
+	private readonly failedCompactionPairs = new Set<string>();
 
 	private readonly sharedBranches = new Map<
 		BranchId,
@@ -425,7 +436,6 @@ export class EditManager<
 			GraphCommit<TChangeset>
 		>[];
 		const trimmedRevisions = trimmedCommits.map((c) => c.revision);
-
 		// The minimum sequence number informs us that all peer branches are at least caught up to the tail commit,
 		// so rebase them accordingly. This is necessary to prevent peer branches from referencing any evicted commits.
 		mainBranch.trimHistory(latestEvicted, sequenceId);
@@ -469,6 +479,172 @@ export class EditManager<
 		this.trimmer.emit("ancestryTrimmed", trimmedRevisions);
 	}
 
+	/**
+	 * Compacts sequenced main-branch history by composing adjacent commits that are no longer needed for correctness.
+	 *
+	 * @param canCompact - Decides, for each adjacent pair of eligible commits (oldest pair first), whether `current` may be composed into `target`.
+	 * When it returns `true` or a metadata tree, `target` is updated in place to contain the composition of both changes and `current` is removed from the history.
+	 * A returned metadata tree replaces the metadata of both commits; `true` keeps the metadata of both (see {@link SharedBranch.composeTrunkCommits}).
+	 * The next pair considered is then the composed `target` and its child, which lets a run of approvals compose more than two commits.
+	 * @param onCommitCompacted - Called after each completed composition, including those before a later failure.
+	 * @param stats - If provided, filled in with statistics about the pass, including those before a later failure.
+	 * @returns The number of commits removed from the history.
+	 *
+	 * @remarks
+	 * Only commits that are retained by the {@link EditManager.setHistoryRetention | retention policy} are eligible.
+	 * History that is still needed for collaboration (the collaboration window) or by registered branches (local forks) is never compacted.
+	 * The newest eligible commit can absorb older commits, but is never itself removed, because later commits depend on its output state.
+	 *
+	 * Composition happens in place: the composed commit keeps the revision, sequence ID, and object identity of `target`,
+	 * so commits based on `target` remain linked to it.
+	 * Before the first composition, every peer branch is rebased onto the newest eligible commit,
+	 * so no peer branch references a commit that compaction removes.
+	 *
+	 * See {@link HistoryCompactionEngineOptions} for how engine failures (as opposed to `canCompact` failures) are handled.
+	 */
+	public compactHistory(
+		canCompact: HistoryCompactionPolicy<TChangeset>,
+		onCommitCompacted?: () => void,
+		stats?: HistoryCompactionStats,
+		options?: HistoryCompactionEngineOptions<TChangeset>,
+	): number {
+		const isolateFailures = options?.isolateFailures === true;
+		if (stats !== undefined) {
+			stats.failureStage = "eligibility";
+		}
+		const mainBranch = this.getSharedBranch("main");
+		const collaborationBound = this.getUpperTrimmingBoundForMinimumSequenceNumber();
+		const localForkBound = this.getUpperTrimmingBoundForLocalForks();
+		const correctnessBound = minSequenceId(collaborationBound, localForkBound);
+		// NOTE: A separate revision-preservation implementation can exclude pinned boundaries
+		// from the eligible pairs below. This branch has no pin state or preservation policy.
+		const sequencedCommitCount = mainBranch.sequenceIdToCommit.size - 1;
+		const forkBase = this.trunkBranches.minKey();
+		const head = mainBranch.sequenceIdToCommit.maxKey() ?? minimumPossibleSequenceId;
+		const comparison = sequenceIdComparator(localForkBound, collaborationBound);
+		const limitingBoundary =
+			sequencedCommitCount === 0
+				? "noRetainedHistory"
+				: sequenceIdComparator(correctnessBound, head) >= 0
+					? "none"
+					: forkBase === undefined || comparison > 0
+						? "collaboration"
+						: comparison < 0
+							? "localFork"
+							: "both";
+		if (stats !== undefined) {
+			stats.sequencedCommitCount = sequencedCommitCount;
+			stats.unsequencedCommitCount = this.getLocalCommits("main").length;
+			stats.retainedCommitCount = sequencedCommitCount + stats.unsequencedCommitCount;
+			stats.limitingBoundary = limitingBoundary;
+			stats.collaborationBoundSequenceNumber = collaborationBound.sequenceNumber;
+			stats.collaborationBoundIndexInBatch = "endOfBatch";
+			stats.localForkBoundSequenceNumber = localForkBound.sequenceNumber;
+			stats.localForkBoundIndexInBatch =
+				localForkBound.indexInBatch === Number.POSITIVE_INFINITY
+					? "endOfBatch"
+					: (localForkBound.indexInBatch ?? 0);
+			stats.activeForkCount = 0;
+			for (const branches of this.trunkBranches.values()) {
+				stats.activeForkCount += branches.size;
+			}
+			stats.oldestForkBaseSequenceNumber = forkBase?.sequenceNumber;
+			stats.oldestForkBaseIndexInBatch =
+				forkBase?.indexInBatch ?? (forkBase === undefined ? undefined : 0);
+			stats.collaborationBoundLag = Math.max(
+				0,
+				head.sequenceNumber - collaborationBound.sequenceNumber,
+			);
+		}
+		const newestEligible = mainBranch.sequenceIdToCommit.getPairOrNextLower(correctnessBound);
+		if (newestEligible === undefined) {
+			return 0;
+		}
+
+		const eligible = getPathFromBase(newestEligible[1], this.trunkBase);
+		if (stats !== undefined) {
+			stats.eligibleCommitCount = eligible.length;
+			stats.eligiblePairCount = Math.max(0, eligible.length - 1);
+		}
+		let removedCount = 0;
+		let peersRebased = false;
+		for (let index = 1; index < eligible.length; index++) {
+			// If the previous pair was composed, `current` is the composed commit, because composition mutates `target` in place.
+			const current =
+				eligible[index - 1] ?? fail("Expected an eligible commit before the candidate");
+			const target = eligible[index] ?? fail("Expected an eligible candidate commit");
+			const pairKey = compactionPairKey(current.revision, target.revision);
+			if (isolateFailures && this.failedCompactionPairs.has(pairKey)) {
+				if (stats !== undefined) {
+					stats.skippedFailedPairCount++;
+				}
+				continue;
+			}
+			if (stats !== undefined) {
+				stats.failureStage = "policy";
+			}
+			const decision = canCompact(current, target);
+			if (decision !== false) {
+				if (!peersRebased) {
+					if (stats !== undefined) {
+						stats.failureStage = "peerRebase";
+					}
+					// A peer branch may be based on (or contain) a commit that is about to be composed away.
+					// Every peer has seen the newest eligible commit (it is within the minimum sequence number bound),
+					// so rebasing peers onto it removes their references to the commits that compaction removes.
+					try {
+						mainBranch.rebasePeersOnto(newestEligible[1]);
+					} catch (error: unknown) {
+						if (!isolateFailures) {
+							throw error;
+						}
+						// Nothing has been composed yet, and a peer rebased onto a commit it has already seen is valid,
+						// so the history is unchanged. Composing without rebasing every peer is unsafe, so end the pass.
+						if (stats !== undefined) {
+							stats.failedPairCount++;
+							stats.isolatedFailureStage ??= "peerRebase";
+						}
+						options?.onEngineFailure?.(error);
+						return removedCount;
+					}
+					peersRebased = true;
+					if (stats !== undefined) {
+						stats.peerBranchCount = mainBranch.getPeerBranchCount();
+					}
+				}
+				if (stats !== undefined) {
+					stats.failureStage = "composition";
+				}
+				try {
+					mainBranch.composeTrunkCommits(
+						current,
+						target,
+						decision === true ? undefined : decision,
+						options?.validateComposedChange,
+					);
+				} catch (error: unknown) {
+					if (!isolateFailures) {
+						throw error;
+					}
+					// `composeTrunkCommits` does not mutate anything when it throws, so the pair stays as it was.
+					// Remember it so later passes in this session do not retry a deterministic failure.
+					this.failedCompactionPairs.add(pairKey);
+					if (stats !== undefined) {
+						stats.failedPairCount++;
+						stats.isolatedFailureStage ??= "composition";
+					}
+					options?.onEngineFailure?.(error);
+					continue;
+				}
+				this.trimState.trimmedCommitCount++;
+				this.trimmer.emit("ancestryCompacted", current.revision, target.revision);
+				removedCount++;
+				onCommitCompacted?.();
+			}
+		}
+		return removedCount;
+	}
+
 	public isEmpty(): boolean {
 		for (const branch of this.sharedBranches.values()) {
 			if (!branch.isEmpty(this.trunkBase)) {
@@ -506,7 +682,11 @@ export class EditManager<
 			}
 		}
 		const mainSummary = mainBranch.getSummaryData(minBaseSeqId, this.trunkBase.revision);
-		return { main: mainSummary, branches, originator: this.localSessionId };
+		return {
+			main: mainSummary,
+			branches,
+			originator: this.localSessionId,
+		};
 	}
 
 	public loadSummaryData(data: SummaryData<TChangeset>): void {
@@ -771,7 +951,140 @@ export class EditManager<
 }
 
 /**
- * The in-memory data that summaries contain
+ * Internal decision callback for composing adjacent retained trunk commits.
+ * A metadata tree replaces the pair's metadata; `true` retains both metadata trees.
+ */
+export type HistoryCompactionPolicy<TChangeset> = (
+	current: GraphCommit<TChangeset>,
+	target: GraphCommit<TChangeset>,
+) => boolean | CustomMetadataTree;
+
+/**
+ * Statistics about one {@link EditManager.compactHistory} pass, used for telemetry.
+ */
+export interface HistoryCompactionStats {
+	/**
+	 * Available main-branch commits, excluding the trimmed base, when the pass starts.
+	 */
+	retainedCommitCount: number;
+	/**
+	 * Sequenced main-branch commits, including those protected by correctness bounds.
+	 */
+	sequencedCommitCount: number;
+	/**
+	 * Local main-branch commits not yet sequenced.
+	 */
+	unsequencedCommitCount: number;
+	/**
+	 * The bound that excludes available sequenced history, or why no bound is needed.
+	 */
+	limitingBoundary: "localFork" | "collaboration" | "both" | "noRetainedHistory" | "none";
+	/**
+	 * Inclusive collaboration upper bound, in sequence-number and batch coordinates.
+	 */
+	collaborationBoundSequenceNumber?: number;
+	collaborationBoundIndexInBatch?: number | "endOfBatch";
+	/**
+	 * Inclusive registered-fork upper bound, in sequence-number and batch coordinates.
+	 */
+	localForkBoundSequenceNumber?: number;
+	localForkBoundIndexInBatch?: number | "endOfBatch";
+	/**
+	 * Registered branches, excluding the main local branch and remote peer branches.
+	 */
+	activeForkCount: number;
+	/**
+	 * Oldest registered fork base, in sequence-number and batch coordinates.
+	 */
+	oldestForkBaseSequenceNumber?: number;
+	oldestForkBaseIndexInBatch?: number;
+	/**
+	 * Sequence-number distance from the latest trunk commit to the collaboration bound.
+	 */
+	collaborationBoundLag: number;
+	/**
+	 * Last engine stage entered; only emitted as a failure stage if the pass fails.
+	 */
+	failureStage?: "eligibility" | "policy" | "peerRebase" | "composition";
+	/**
+	 * The number of pairs whose engine failure was isolated (see {@link HistoryCompactionEngineOptions.isolateFailures}).
+	 */
+	failedPairCount: number;
+	/**
+	 * The stage of the first isolated engine failure in this pass, if any.
+	 */
+	isolatedFailureStage?: "peerRebase" | "composition";
+	/**
+	 * The number of pairs skipped without consulting the policy because they failed in an earlier pass.
+	 */
+	skippedFailedPairCount: number;
+	/**
+	 * The number of trunk commits eligible for compaction when the pass started.
+	 */
+	eligibleCommitCount: number;
+	/**
+	 * The number of adjacent pairs of eligible commits.
+	 */
+	eligiblePairCount: number;
+	/**
+	 * The number of peer branches rebased before the first composition, or 0 if nothing was composed.
+	 */
+	peerBranchCount: number;
+}
+
+/**
+ * Creates a zeroed {@link HistoryCompactionStats}.
+ */
+export function createHistoryCompactionStats(): HistoryCompactionStats {
+	return {
+		retainedCommitCount: 0,
+		sequencedCommitCount: 0,
+		unsequencedCommitCount: 0,
+		limitingBoundary: "noRetainedHistory",
+		activeForkCount: 0,
+		collaborationBoundLag: 0,
+		eligibleCommitCount: 0,
+		eligiblePairCount: 0,
+		peerBranchCount: 0,
+		failedPairCount: 0,
+		skippedFailedPairCount: 0,
+	};
+}
+
+/**
+ * Options for how {@link EditManager.compactHistory} handles failures inside the compaction engine.
+ */
+export interface HistoryCompactionEngineOptions<TChangeset> {
+	/**
+	 * When `true`, a failure to rebase peers or to compose a pair does not escape the pass.
+	 * @remarks
+	 * The failing step leaves the history unchanged: a failed composition skips that pair, and a failed peer rebase ends the pass.
+	 * A failed pair is remembered for the lifetime of the {@link EditManager} and skipped in later passes.
+	 * Failures from the `canCompact` callback are never isolated; they always propagate to the caller.
+	 */
+	readonly isolateFailures?: boolean;
+	/**
+	 * Called with each isolated failure, for telemetry.
+	 */
+	readonly onEngineFailure?: (error: unknown) => void;
+	/**
+	 * Called with each composed change before it replaces the target commit's change.
+	 * Throwing rejects the composition without modifying the history.
+	 * @remarks Used to check that a composed change can be written to and read from a summary.
+	 */
+	readonly validateComposedChange?: (
+		change: TChangeset,
+		revision: RevisionTag,
+		sessionId: SessionId,
+	) => void;
+}
+
+function compactionPairKey(current: RevisionTag, target: RevisionTag): string {
+	return `${String(current)}:${String(target)}`;
+}
+
+/**
+ * The in-memory data that summaries contain.
  */
 export interface SummaryData<TChangeset> {
 	readonly originator?: SessionId;
@@ -1021,7 +1334,9 @@ class SharedBranch<TEditor extends ChangeFamilyEditor, TChangeset, TChangeProces
 	}
 
 	public trimHistory(newBase: GraphCommit<TChangeset>, sequenceId: SequenceId): void {
-		this.rebasePeers(newBase);
+		this.rebasePeersOnto(newBase);
+		// The metadata for new trunk base revision needs to be deleted before modifying it.
+		this.commitMetadata.delete(newBase.revision);
 
 		this.sequenceIdToCommit.editRange(
 			minimumPossibleSequenceId,
@@ -1053,13 +1368,68 @@ class SharedBranch<TEditor extends ChangeFamilyEditor, TChangeset, TChangeProces
 		);
 	}
 
-	private rebasePeers(commit: GraphCommit<TChangeset>): void {
+	/**
+	 * Composes `current` into its child `target`, removing `current` from this branch's trunk.
+	 * @remarks
+	 * `target` is mutated in place, so that commits which have `target` as their parent remain linked to it.
+	 * It keeps its revision and sequence ID. The composed change preserves its original revision-scoped identities.
+	 * Its metadata becomes `mergedMetadata` if provided.
+	 * Otherwise it becomes the metadata of both commits as siblings, so that flattening the metadata lets `target`'s metadata win where both commits use the same property.
+	 */
+	public composeTrunkCommits(
+		current: GraphCommit<TChangeset>,
+		target: GraphCommit<TChangeset>,
+		mergedMetadata?: CustomMetadataTree,
+		validateComposedChange?: HistoryCompactionEngineOptions<TChangeset>["validateComposedChange"],
+	): void {
+		assert(target.parent === current, "Only adjacent commits can be composed");
+		assert(current.parent !== undefined, "The trunk base cannot be composed away");
+		const currentMetadata = this.commitMetadata.get(current.revision);
+		assert(currentMetadata !== undefined, "Only sequenced trunk commits can be composed");
+
+		const composed = target as Mutable<GraphCommit<TChangeset>>;
+		const { rebaser } = this.changeFamily;
+		const composedChange = rebaser.compose([
+			tagChange(current.change, current.revision),
+			tagChange(target.change, target.revision),
+		]);
+		// Keep the original namespace ordering as well as atom IDs. Future composition can
+		// compare cells from different compaction groups after their commits are removed.
+		if (validateComposedChange !== undefined) {
+			const targetMetadata =
+				this.commitMetadata.get(target.revision) ??
+				fail("Only sequenced trunk commits can be composed");
+			validateComposedChange(composedChange, target.revision, targetMetadata.sessionId);
+		}
+		const customMetadata =
+			mergedMetadata ?? composeCustomMetadata(current.customMetadata, target.customMetadata);
+		if (customMetadata !== undefined) {
+			// Change-codec validation does not cover the separately encoded commit metadata.
+			JSON.stringify(encodeCustomMetadataTree(customMetadata));
+		}
+		// Nothing is mutated before this point, so a failure above leaves both commits unchanged.
+		replaceChangeInPlace(composed, composedChange);
+		composed.customMetadata = customMetadata;
+		composed.parent = current.parent;
+
+		this.sequenceIdToCommit.delete(currentMetadata.sequenceId);
+		this.commitMetadata.delete(current.revision);
+	}
+
+	/**
+	 * Rebases every peer branch that is behind `commit` onto it.
+	 * @remarks
+	 * Peer branches that already include `commit` are unchanged.
+	 * `commit` must be a trunk commit that every peer has seen (i.e. at or below the minimum sequence number).
+	 */
+	public rebasePeersOnto(commit: GraphCommit<TChangeset>): void {
 		for (const [, branch] of this.peerLocalBranches) {
 			branch.rebaseOnto(this.trunk, commit);
 		}
+	}
 
-		// The metadata for new trunk base revision needs to be deleted before modifying it.
-		this.commitMetadata.delete(commit.revision);
+	public getPeerBranchCount(): number {
+		return this.peerLocalBranches.size;
 	}
 
 	public getLocalCommits(): readonly GraphCommit<TChangeset>[] {
@@ -1337,3 +1707,35 @@ type OnSequenceCommit<TChangeset> = (
 	sequenceId: SequenceId,
 	prevSequenceId: SequenceId,
 ) => void;
+
+// Only flatten wrappers created by compaction, never authored transaction subtrees.
+const compactionMetadata = new WeakSet<CustomMetadataTree>();
+
+/**
+ * Combines the metadata of two composed commits by making them siblings in a new metadata tree.
+ * @remarks
+ * Sibling order matches commit order, so when the result is flattened the later commit's metadata wins.
+ * If only one commit has metadata, that metadata is used unchanged.
+ * Synthetic wrappers from previous merges are flattened to avoid depth proportional to history length.
+ * Loaded trees are treated as authored trees because the wire format does not distinguish synthetic wrappers.
+ */
+function composeCustomMetadata(
+	before: CustomMetadataTree | undefined,
+	after: CustomMetadataTree | undefined,
+): CustomMetadataTree | undefined {
+	if (before === undefined) {
+		return after;
+	}
+	if (after === undefined) {
+		return before;
+	}
+	const combined: CustomMetadataTree = {
+		metadata: undefined,
+		children: [
+			...(compactionMetadata.has(before) ? before.children : [before]),
+			...(compactionMetadata.has(after) ? after.children : [after]),
+		],
+	};
+	compactionMetadata.add(combined);
+	return combined;
+}

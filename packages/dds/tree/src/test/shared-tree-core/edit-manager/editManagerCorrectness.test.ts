@@ -11,15 +11,18 @@ import { validateAssertionError } from "@fluidframework/test-runtime-utils/inter
 
 import {
 	type ChangeFamilyEditor,
+	type CustomMetadataTree,
 	CommitKind,
 	type GraphCommit,
 	type RevisionTag,
+	diffHistories,
 } from "../../../core/index.js";
 import type {
 	Commit,
 	EditManager,
 	SharedTreeBranch,
 } from "../../../shared-tree-core/index.js";
+import { createHistoryCompactionStats } from "../../../shared-tree-core/index.js";
 import { brand, makeArray } from "../../../util/index.js";
 import type { TestChangeFamily } from "../../testChange.js";
 import { NoOpChangeRebaser, TestChange } from "../../testChange.js";
@@ -1512,6 +1515,505 @@ export function testCorrectness(): void {
 					}
 				}
 			}
+		});
+
+		describe("compactHistory", () => {
+			/**
+			 * Sequences `count` peer commits on a manager that retains all history, then advances the minimum sequence number to `msn`.
+			 */
+			function setupRetainedHistory(count: number, msn: number): TestEditManager {
+				const { manager } = testChangeEditManagerFactory({ historyRetention: true });
+				sequencePeerCommits(manager, count, 1, 1);
+				manager.advanceMinimumSequenceNumber(brand(msn));
+				assert.equal(manager.getTrunkCommits("main").length, count);
+				return manager;
+			}
+
+			function trunkIntentions(manager: TestEditManager): number[][] {
+				return manager
+					.getTrunkChanges("main")
+					.map((change) => (TestChange.isNonEmptyChange(change) ? change.intentions : []));
+			}
+
+			for (const count of [0, 1]) {
+				it(`leaves ${count} retained commits unchanged without offering a pair`, () => {
+					const manager = setupRetainedHistory(count, count);
+					const head = manager.getTrunkHead("main");
+					assert.equal(
+						manager.compactHistory(() => assert.fail("No pair exists")),
+						0,
+					);
+					assert.equal(manager.getTrunkHead("main"), head);
+					assert.equal(manager.getLocalBranch("main").getCommitCount(), count);
+				});
+			}
+
+			it("is idempotent until new commits become eligible", () => {
+				const manager = setupRetainedHistory(3, 3);
+				assert.equal(
+					manager.compactHistory(() => true),
+					2,
+				);
+				const survivor = manager.getTrunkHead("main");
+				const change = survivor.change;
+				let notifications = 0;
+				manager.getLocalBranch("main").events.on("ancestryCompacted", () => notifications++);
+
+				assert.equal(
+					manager.compactHistory(() => assert.fail("No pair exists")),
+					0,
+				);
+				assert.equal(manager.getTrunkHead("main"), survivor);
+				assert.equal(survivor.change, change);
+				assert.equal(notifications, 0);
+
+				sequencePeerCommits(manager, 2, 4, 4);
+				assert.equal(
+					manager.compactHistory(() => assert.fail("New edits are protected")),
+					0,
+				);
+				manager.advanceMinimumSequenceNumber(brand(5));
+				assert.equal(
+					manager.compactHistory(() => true),
+					2,
+				);
+				assert.equal(notifications, 2);
+				assert.deepEqual(trunkIntentions(manager), [[1, 2, 3, 4, 5]]);
+				checkChangeList(manager, [1, 2, 3, 4, 5]);
+			});
+
+			it("moves the eligibility boundary as nested and newer forks are disposed", () => {
+				const manager = setupRetainedHistory(3, 3);
+				const main = manager.getLocalBranch("main");
+				const oldest = main.fork();
+				const child = oldest.fork();
+				const oldBase = child.getHead();
+				const oldChange = oldBase.change;
+				sequencePeerCommits(manager, 2, 4, 4);
+				const newer = main.fork();
+				const newerBase = newer.getHead();
+				const newerChange = newerBase.change;
+				sequencePeerCommits(manager, 1, 6, 6);
+				manager.advanceMinimumSequenceNumber(brand(6));
+				const stats = createHistoryCompactionStats();
+
+				assert.equal(
+					manager.compactHistory(() => true, undefined, stats),
+					1,
+				);
+				assert.equal(stats.activeForkCount, 3);
+				oldest.dispose();
+				assert.equal(
+					manager.compactHistory(() => true, undefined, stats),
+					0,
+				);
+				assert.equal(stats.activeForkCount, 2);
+				assert.equal(child.getHead(), oldBase);
+				assert.equal(oldBase.change, oldChange);
+				child.dispose();
+				assert.equal(
+					manager.compactHistory(() => true, undefined, stats),
+					2,
+				);
+				assert.equal(stats.activeForkCount, 1);
+				assert.equal(newer.getHead(), newerBase);
+				assert.equal(newerBase.change, newerChange);
+				assert.deepEqual(trunkIntentions(manager), [[1, 2, 3, 4], [5], [6]]);
+				newer.dispose();
+				assert.equal(
+					manager.compactHistory(() => true, undefined, stats),
+					2,
+				);
+				assert.equal(stats.activeForkCount, 0);
+				assert.deepEqual(trunkIntentions(manager), [[1, 2, 3, 4, 5, 6]]);
+				checkChangeList(manager, [1, 2, 3, 4, 5, 6]);
+			});
+
+			// Identical eligible counts can be caused by different correctness bounds.
+			for (const boundary of ["localFork", "collaboration", "both"] as const) {
+				it(`identifies ${boundary} as the reason only one commit is eligible`, () => {
+					const manager = setupRetainedHistory(2, 1);
+					const fork =
+						boundary === "collaboration" ? undefined : manager.getLocalBranch("main").fork();
+					sequencePeerCommits(manager, 2, 3, 3);
+					if (boundary === "localFork") {
+						manager.advanceMinimumSequenceNumber(brand(4));
+					}
+					const stats = createHistoryCompactionStats();
+					manager.compactHistory(() => assert.fail("No eligible pairs"), undefined, stats);
+					assert.equal(stats.limitingBoundary, boundary);
+					assert.equal(stats.retainedCommitCount, 4);
+					assert.equal(stats.sequencedCommitCount, 4);
+					assert.equal(stats.unsequencedCommitCount, 0);
+					assert.equal(stats.eligibleCommitCount, 1);
+					assert.equal(stats.eligiblePairCount, 0);
+					assert.equal(stats.activeForkCount, fork === undefined ? 0 : 1);
+					assert.equal(stats.collaborationBoundIndexInBatch, "endOfBatch");
+					if (fork !== undefined) {
+						assert.equal(stats.localForkBoundSequenceNumber, 1);
+						assert.equal(stats.localForkBoundIndexInBatch, "endOfBatch");
+						assert.equal(stats.oldestForkBaseSequenceNumber, 2);
+						fork.dispose();
+						const released = createHistoryCompactionStats();
+						manager.compactHistory(() => false, undefined, released);
+						assert.equal(released.activeForkCount, 0);
+						assert.equal(
+							released.limitingBoundary,
+							boundary === "localFork" ? "none" : "collaboration",
+						);
+					}
+				});
+			}
+
+			it("distinguishes unavailable retained history from a collaboration-protected prefix", () => {
+				const { manager } = testChangeEditManagerFactory({ historyRetention: false });
+				sequencePeerCommits(manager, 3, 1, 1);
+				manager.advanceMinimumSequenceNumber(brand(3));
+				const stats = createHistoryCompactionStats();
+				manager.compactHistory(() => assert.fail("No history"), undefined, stats);
+				assert.equal(stats.limitingBoundary, "noRetainedHistory");
+				assert.equal(stats.retainedCommitCount, 0);
+				assert.equal(stats.eligibleCommitCount, 0);
+			});
+
+			it("reports the fork boundary within a sequenced batch instead of treating the whole batch as protected", () => {
+				const manager = setupRetainedHistory(0, 0);
+				manager.addSequencedChanges(
+					[1, 2].map((intention) => ({
+						change: TestChange.mint(intention === 1 ? [] : [1], [intention]),
+						revision: mintRevisionTag(),
+						customMetadata: undefined,
+					})),
+					peer1,
+					brand(1),
+					brand(0),
+					"main",
+				);
+				const fork = manager.getLocalBranch("main").fork();
+				manager.advanceMinimumSequenceNumber(brand(1));
+				const stats = createHistoryCompactionStats();
+				manager.compactHistory(() => assert.fail("One eligible commit"), undefined, stats);
+				assert.equal(stats.limitingBoundary, "localFork");
+				assert.equal(stats.eligibleCommitCount, 1);
+				assert.equal(stats.localForkBoundSequenceNumber, 1);
+				assert.equal(stats.localForkBoundIndexInBatch, 0);
+				assert.equal(stats.collaborationBoundSequenceNumber, 1);
+				assert.equal(stats.collaborationBoundIndexInBatch, "endOfBatch");
+				assert.equal(stats.oldestForkBaseIndexInBatch, 1);
+				fork.dispose();
+			});
+
+			it("does nothing when no history is retained beyond the collaboration window", () => {
+				const { manager } = testChangeEditManagerFactory({ historyRetention: false });
+				sequencePeerCommits(manager, 3, 1, 1);
+				manager.advanceMinimumSequenceNumber(brand(3));
+				const removed = manager.compactHistory(() => assert.fail("Should not be called"));
+				assert.equal(removed, 0);
+			});
+
+			it("does nothing when all retained history is inside the collaboration window", () => {
+				const manager = setupRetainedHistory(3, 0);
+				const removed = manager.compactHistory(() => assert.fail("Should not be called"));
+				assert.equal(removed, 0);
+				assert.equal(manager.getTrunkCommits("main").length, 3);
+			});
+
+			it("offers adjacent pairs oldest first and keeps commits the policy rejects", () => {
+				const manager = setupRetainedHistory(4, 4);
+				const revisions = manager.getTrunkCommits("main").map((c) => c.revision);
+				const offered: [RevisionTag, RevisionTag][] = [];
+				const removed = manager.compactHistory((before, after) => {
+					offered.push([before.revision, after.revision]);
+					return false;
+				});
+				assert.equal(removed, 0);
+				assert.deepEqual(offered, [
+					[revisions[0], revisions[1]],
+					[revisions[1], revisions[2]],
+					[revisions[2], revisions[3]],
+				]);
+				assert.deepEqual(trunkIntentions(manager), [[1], [2], [3], [4]]);
+			});
+
+			it("composes all eligible history into the newest eligible commit", () => {
+				const manager = setupRetainedHistory(4, 4);
+				const newest = manager.getTrunkHead("main");
+				const removed = manager.compactHistory(() => true);
+				assert.equal(removed, 3);
+				const trunk = manager.getTrunkCommits("main");
+				assert.equal(trunk.length, 1);
+				assert.equal(trunk[0], newest, "The newest eligible commit survives in place");
+				assert.deepEqual(trunkIntentions(manager), [[1, 2, 3, 4]]);
+				checkChangeList(manager, [1, 2, 3, 4]);
+			});
+
+			for (const warmCache of [false, true]) {
+				for (const selective of [false, true]) {
+					it(`updates main and fork counts before notifications (warm cache: ${warmCache}, selective: ${selective})`, () => {
+						const manager = setupRetainedHistory(5, 5);
+						const main = manager.getLocalBranch("main");
+						if (warmCache) {
+							assert.equal(main.getCommitCount(), 5);
+						}
+						const fork = main.fork();
+						const second = manager.getTrunkCommits("main")[1].revision;
+						let notifications = 0;
+						main.events.on("ancestryCompacted", () => {
+							notifications++;
+							assert.equal(main.getCommitCount(), 5 - notifications);
+							assert.equal(fork.getCommitCount(), 5 - notifications);
+						});
+
+						const removed = manager.compactHistory(
+							(_, target) => !selective || target.revision === second,
+						);
+
+						// The fork protects the last commit, leaving four eligible commits.
+						assert.equal(removed, selective ? 1 : 3);
+						assert.equal(notifications, removed);
+						assert.equal(main.getCommitCount(), manager.getTrunkCommits("main").length);
+						const laterFork = main.fork();
+						assert.equal(laterFork.getCommitCount(), 5 - removed);
+						laterFork.dispose();
+						fork.dispose();
+						manager.setHistoryRetention(false);
+						assert.equal(main.getCommitCount(), 0);
+					});
+				}
+			}
+
+			it("rejects unencodable replacement metadata before changing the graph or counts", () => {
+				const manager = setupRetainedHistory(2, 2);
+				const main = manager.getLocalBranch("main");
+				assert.equal(main.getCommitCount(), 2);
+				const before = manager.getTrunkCommits("main");
+				const changes = before.map((commit) => commit.change);
+				let metadata: CustomMetadataTree = { metadata: { label: "nested" }, children: [] };
+				for (let depth = 0; depth < 10000; depth++) {
+					metadata = { metadata: undefined, children: [metadata] };
+				}
+				const stats = createHistoryCompactionStats();
+
+				assert.equal(
+					manager.compactHistory(() => metadata, undefined, stats, {
+						isolateFailures: true,
+					}),
+					0,
+				);
+
+				assert.equal(stats.failedPairCount, 1);
+				assert.equal(main.getCommitCount(), 2);
+				assert.deepEqual(manager.getTrunkCommits("main"), before);
+				assert.deepEqual(
+					before.map((commit) => commit.change),
+					changes,
+				);
+				assert(before.every((commit) => commit.customMetadata === undefined));
+			});
+
+			it("invalidates cached rollback data when the surviving commit absorbs older changes", () => {
+				const { manager, family } = testChangeEditManagerFactory({ historyRetention: true });
+				sequencePeerCommits(manager, 4, 1, 1);
+				manager.advanceMinimumSequenceNumber(brand(4));
+				const [first] = manager.getTrunkCommits("main");
+				const base = first.parent ?? assert.fail();
+				const main = manager.getLocalBranch("main");
+				const divergent = main.fork(first);
+				applyBranchCommit(divergent, [1], 99);
+				const temporary = main.fork();
+				temporary.rebaseOnto(divergent);
+				temporary.dispose();
+				divergent.dispose();
+				assert.equal(
+					manager.compactHistory(() => true),
+					3,
+				);
+				const rollback = diffHistories(
+					family.rebaser,
+					manager.getTrunkHead("main"),
+					base,
+					mintRevisionTag,
+				);
+				assert(TestChange.isNonEmptyChange(rollback));
+				assert.deepEqual(rollback.intentions, [-4, -3, -2, -1]);
+			});
+
+			it("offers an already-composed commit as the next `before`", () => {
+				const manager = setupRetainedHistory(4, 4);
+				const revisions = manager.getTrunkCommits("main").map((c) => c.revision);
+				const offeredBefore: number[][] = [];
+				manager.compactHistory((before) => {
+					offeredBefore.push(
+						TestChange.isNonEmptyChange(before.change) ? before.change.intentions : [],
+					);
+					return true;
+				});
+				assert.deepEqual(offeredBefore, [[1], [1, 2], [1, 2, 3]]);
+				assert.equal(manager.getTrunkHead("main").revision, revisions[3]);
+			});
+
+			it("composes only the pairs the policy accepts", () => {
+				const manager = setupRetainedHistory(5, 5);
+				const revisions = manager.getTrunkCommits("main").map((c) => c.revision);
+				// Combine 1 into 2, and 3 into 4, but keep the boundaries between 2 and 3, and 4 and 5.
+				const removed = manager.compactHistory(
+					(_, after) => after.revision === revisions[1] || after.revision === revisions[3],
+				);
+				assert.equal(removed, 2);
+				assert.deepEqual(trunkIntentions(manager), [[1, 2], [3, 4], [5]]);
+				assert.deepEqual(
+					manager.getTrunkCommits("main").map((c) => c.revision),
+					[revisions[1], revisions[3], revisions[4]],
+				);
+				checkChangeList(manager, [1, 2, 3, 4, 5]);
+			});
+
+			it("never offers commits inside the collaboration window", () => {
+				const manager = setupRetainedHistory(6, 3);
+				const revisions = manager.getTrunkCommits("main").map((c) => c.revision);
+				const offeredAfter: RevisionTag[] = [];
+				const removed = manager.compactHistory((_, after) => {
+					offeredAfter.push(after.revision);
+					return true;
+				});
+				assert.equal(removed, 2);
+				assert.deepEqual(offeredAfter, [revisions[1], revisions[2]]);
+				assert.deepEqual(trunkIntentions(manager), [[1, 2, 3], [4], [5], [6]]);
+				checkChangeList(manager, [1, 2, 3, 4, 5, 6]);
+			});
+
+			it("never offers commits needed by a local fork", () => {
+				const { manager } = testChangeEditManagerFactory({ historyRetention: true });
+				sequencePeerCommits(manager, 3, 1, 1);
+				const fork = manager.getLocalBranch("main").fork();
+				sequencePeerCommits(manager, 3, 4, 4);
+				manager.advanceMinimumSequenceNumber(brand(6));
+				const forkBase = fork.getHead();
+				const forkBaseChange = forkBase.change;
+				const removed = manager.compactHistory(() => true);
+				// The fork's base commit must keep its original change, so only commits before it can be composed.
+				assert.equal(removed, 1);
+				assert.deepEqual(trunkIntentions(manager), [[1, 2], [3], [4], [5], [6]]);
+				assert.equal(manager.getTrunkCommits("main")[1], forkBase);
+				assert.equal(forkBase.change, forkBaseChange);
+			});
+
+			it("merges metadata so that the newer commit wins", () => {
+				const { manager } = testChangeEditManagerFactory({ historyRetention: true });
+				const metadata = [
+					{ metadata: { label: "first", keep: true }, children: [] },
+					undefined,
+					{ metadata: { label: "third" }, children: [] },
+				];
+				for (const [index, customMetadata] of metadata.entries()) {
+					const intention = index + 1;
+					manager.addSequencedChanges(
+						[
+							{
+								change: TestChange.mint(
+									makeArray(index, (j) => j + 1),
+									[intention],
+								),
+								revision: mintRevisionTag(),
+								customMetadata,
+							},
+						],
+						peer1,
+						brand(intention),
+						brand(index),
+						"main",
+					);
+				}
+				manager.advanceMinimumSequenceNumber(brand(3));
+				manager.compactHistory(() => true);
+				const [composed] = manager.getTrunkCommits("main");
+				assert.deepEqual(composed?.customMetadata, {
+					metadata: undefined,
+					children: [metadata[0], metadata[2]],
+				});
+			});
+
+			for (const concurrent of [false, true]) {
+				it(`keeps an idle peer's branch consistent when its last commit is composed away${concurrent ? " (concurrent peer edit)" : ""}`, () => {
+					const { manager } = testChangeEditManagerFactory({ historyRetention: true });
+					const sequence = (
+						sessionId: SessionId,
+						inputContext: number[],
+						intention: number,
+						sequenceNumber: number,
+						referenceSequenceNumber: number,
+					): void =>
+						manager.addSequencedChanges(
+							[
+								{
+									change: TestChange.mint(inputContext, [intention]),
+									revision: mintRevisionTag(),
+									customMetadata: undefined,
+								},
+							],
+							sessionId,
+							brand(sequenceNumber),
+							brand(referenceSequenceNumber),
+							"main",
+						);
+					if (concurrent) {
+						// peer2's edit is concurrent with peer1's, so peer2's branch keeps its own (un-rebased) commit.
+						sequence(peer1, [], 1, 1, 0);
+						sequence(peer2, [], 2, 2, 0);
+					} else {
+						// peer2's edit is fast-forwarded, so peer2's branch head is that trunk commit.
+						sequence(peer2, [], 1, 1, 0);
+						sequence(peer1, [1], 2, 2, 1);
+					}
+					sequencePeerCommits(manager, 2, 3, 3);
+					manager.advanceMinimumSequenceNumber(brand(4));
+					assert.equal(
+						manager.compactHistory(() => true),
+						3,
+					);
+
+					// The summary written after compaction must also be consistent for the peer.
+					const { manager: loader } = testChangeEditManagerFactory({
+						historyRetention: true,
+					});
+					loader.loadSummaryData(manager.getSummaryData());
+
+					for (const editManager of [manager, loader]) {
+						editManager.addSequencedChanges(
+							[
+								{
+									change: TestChange.mint([1, 2, 3, 4], [5]),
+									revision: mintRevisionTag(),
+									customMetadata: undefined,
+								},
+							],
+							peer2,
+							brand(5),
+							brand(4),
+							"main",
+						);
+						checkChangeList(editManager, [1, 2, 3, 4, 5]);
+						assert.deepEqual(trunkIntentions(editManager), [[1, 2, 3, 4], [5]]);
+					}
+				});
+			}
+
+			it("supports sequencing, trimming, and summarizing after compaction", () => {
+				const manager = setupRetainedHistory(4, 4);
+				manager.compactHistory(() => true);
+				sequencePeerCommits(manager, 2, 5, 5);
+				manager.advanceMinimumSequenceNumber(brand(6));
+				checkChangeList(manager, [1, 2, 3, 4, 5, 6]);
+				assert.deepEqual(trunkIntentions(manager), [[1, 2, 3, 4], [5], [6]]);
+
+				const { manager: loader } = testChangeEditManagerFactory({ historyRetention: true });
+				loader.loadSummaryData(manager.getSummaryData());
+				checkChangeList(loader, [1, 2, 3, 4, 5, 6]);
+				assert.deepEqual(trunkIntentions(loader), [[1, 2, 3, 4], [5], [6]]);
+
+				manager.setHistoryRetention(false);
+				assert.equal(manager.getTrunkCommits("main").length, 0);
+			});
 		});
 	});
 }

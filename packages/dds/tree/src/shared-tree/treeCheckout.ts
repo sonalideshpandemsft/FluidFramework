@@ -842,6 +842,7 @@ export abstract class CheckoutBase implements ITreeCheckout {
 						return undefined;
 					}
 					const path = pathResult.commitsToUndo;
+					const pathChanges = path.map((commit) => commit.change);
 					let wasUsed = false;
 					return (options) => {
 						if (wasUsed) {
@@ -854,7 +855,10 @@ export abstract class CheckoutBase implements ITreeCheckout {
 						if (
 							!canRevert() ||
 							this.#transaction.branch.getHead() !== head ||
-							path.some((commit) => commit.wasTrimmed)
+							path.some(
+								(commit, index) =>
+									commit.wasTrimmed === true || commit.change !== pathChanges[index],
+							)
 						) {
 							throw new UsageError(
 								"The target branch has changed since `revertTo` was requested. Avoid retaining references directly to the `revertTo` property.",
@@ -1030,6 +1034,7 @@ export abstract class CheckoutBase implements ITreeCheckout {
 		this.#transaction.branch.events.on("commitSequenced", this.onCommitSequenced);
 		this.#transaction.activeBranchEvents.on("afterChange", this.onAfterChange);
 		this.#transaction.activeBranchEvents.on("ancestryTrimmed", this.onAncestryTrimmed);
+		this.#transaction.activeBranchEvents.on("ancestryCompacted", this.onAncestryCompacted);
 	}
 
 	private unregisterFromBranchEvents(): void {
@@ -1037,6 +1042,7 @@ export abstract class CheckoutBase implements ITreeCheckout {
 		this.#transaction.branch.events.off("commitSequenced", this.onCommitSequenced);
 		this.#transaction.activeBranchEvents.off("afterChange", this.onAfterChange);
 		this.#transaction.activeBranchEvents.off("ancestryTrimmed", this.onAncestryTrimmed);
+		this.#transaction.activeBranchEvents.off("ancestryCompacted", this.onAncestryCompacted);
 	}
 
 	private createTransactionStack(
@@ -1053,11 +1059,21 @@ export abstract class CheckoutBase implements ITreeCheckout {
 		return new SquashingTransactionStack(branch, this.mintRevisionTag, () => {
 			// When each transaction is started, make a restorable checkpoint of the current state of removed roots
 			const restoreRemovedRoots = this._removedRoots.createCheckpoint();
+			const ownershipTransfers: [RevisionTag, RevisionTag][] = [];
+			const stopTrackingCompaction = this.#transaction.activeBranchEvents.on(
+				"ancestryCompacted",
+				(removed, surviving) => ownershipTransfers.push([removed, surviving]),
+			);
 			return (result, viewUpdate: SharedTreeChange | undefined) => {
+				stopTrackingCompaction();
 				const newHead = this.#transaction.branch.getHead();
 				switch (result) {
 					case InternalTransactionResult.Abort: {
 						restoreRemovedRoots();
+						// History compaction is not rolled back with the transaction.
+						for (const [removed, surviving] of ownershipTransfers) {
+							this._removedRoots.updateLatestRevisionForRoots(removed, surviving);
+						}
 						if (viewUpdate !== undefined) {
 							this.applyInternalChange(viewUpdate, newHead.revision);
 						}
@@ -1494,6 +1510,13 @@ export abstract class CheckoutBase implements ITreeCheckout {
 			}
 		}
 	}
+
+	private readonly onAncestryCompacted = (
+		removed: RevisionTag,
+		surviving: RevisionTag,
+	): void => {
+		this._removedRoots.updateLatestRevisionForRoots(removed, surviving);
+	};
 
 	private readonly onAncestryTrimmed = (revisions: RevisionTag[]): void => {
 		// When the branch is trimmed, we can garbage collect any repair data whose latest relevant revision is one of the

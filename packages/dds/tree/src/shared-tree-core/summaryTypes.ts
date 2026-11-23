@@ -10,6 +10,7 @@ import type {
 	ITelemetryContext,
 	OldestSupportedClientVersion,
 } from "@fluidframework/runtime-definitions/internal";
+import { gte } from "semver-ts";
 
 // TODO: Organize this to be adjacent to persisted types.
 /**
@@ -108,15 +109,21 @@ export const enum SharedTreeSummaryFormatVersion {
 	 */
 	v2 = 2,
 	/**
+	 * Requires readers with support for inverse namespaces in compacted history.
+	 * The component formats are unchanged.
+	 */
+	v3 = 3,
+	/**
 	 * The latest version of the SharedTree summary. Must be updated when a new version is added.
 	 */
-	vLatest = v2,
+	vLatest = v3,
 }
 
 export const supportedSharedTreeSummaryFormatVersions =
 	new Set<SharedTreeSummaryFormatVersion>([
 		SharedTreeSummaryFormatVersion.v1,
 		SharedTreeSummaryFormatVersion.v2,
+		SharedTreeSummaryFormatVersion.v3,
 	]);
 
 /**
@@ -125,6 +132,7 @@ export const supportedSharedTreeSummaryFormatVersions =
 export function minVersionToSharedTreeSummaryFormatVersion(
 	version: OldestSupportedClientVersion,
 ): SharedTreeSummaryFormatVersion {
-	// Currently, version 2 is written which adds metadata blob to the summary.
-	return SharedTreeSummaryFormatVersion.v2;
+	return gte(version, "3.14.0")
+		? SharedTreeSummaryFormatVersion.v3
+		: SharedTreeSummaryFormatVersion.v2;
 }

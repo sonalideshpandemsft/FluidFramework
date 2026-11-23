@@ -60,6 +60,9 @@ export { EditManagerSummarizer } from "./editManagerSummarizer.js";
 export {
 	EditManager,
 	minimumPossibleSequenceNumber,
+	createHistoryCompactionStats,
+	type HistoryCompactionStats,
+	type HistoryCompactionPolicy,
 	type SummaryData,
 	type SharedBranchSummaryData,
 } from "./editManager.js";

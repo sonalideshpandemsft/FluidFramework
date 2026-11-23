@@ -54,7 +54,13 @@ import type { BranchId, SharedTreeBranch } from "./branch.js";
 import { BranchCommitEnricher } from "./branchCommitEnricher.js";
 import type { ChangeEnricher } from "./changeEnricher.js";
 import { DefaultResubmitMachine } from "./defaultResubmitMachine.js";
-import { EditManager, minimumPossibleSequenceNumber } from "./editManager.js";
+import {
+	EditManager,
+	minimumPossibleSequenceNumber,
+	createHistoryCompactionStats,
+	type HistoryCompactionPolicy,
+	type HistoryCompactionStats,
+} from "./editManager.js";
 import { makeEditManagerCodecBuilder } from "./editManagerCodecs.js";
 import type { EditManagerFormatVersion, SeqNumber } from "./editManagerFormatCommons.js";
 import { EditManagerSummarizer } from "./editManagerSummarizer.js";
@@ -66,7 +72,7 @@ import {
 	minVersionToSharedTreeSummaryFormatVersion,
 	summarizablesTreeKey,
 	supportedSharedTreeSummaryFormatVersions,
-	type SharedTreeSummaryFormatVersion,
+	SharedTreeSummaryFormatVersion,
 	type Summarizable,
 	type SummaryElementParser,
 	type SummaryElementStringifier,
@@ -116,6 +122,12 @@ export class SharedTreeCore<
 	implements WithBreakable, Summarizable
 {
 	private readonly editManager: EditManager<TEditor, TChange, TChangeProcessingContext>;
+	private summaryCompactionPolicy: HistoryCompactionPolicy<TChange> | undefined;
+	private readonly validateComposedChange: (
+		change: TChange,
+		revision: RevisionTag,
+		sessionId: SessionId,
+	) => void;
 	private readonly summarizables: readonly Summarizable[];
 	/**
 	 * The sequence number that this instance is at.
@@ -216,6 +228,19 @@ export class SharedTreeCore<
 			dependentChangeFormatVersion: changeFormatVersionForEditManager,
 			revisionTagCodec,
 		});
+		const summaryChangeCodec = changeFamily.codecs.resolve(
+			changeFormatVersionForEditManager.lookup(editManagerCodec.writeVersion),
+		);
+		this.validateComposedChange = (change, revision, sessionId) => {
+			const context = {
+				originatorId: sessionId,
+				revision,
+				idCompressor: this.idCompressor,
+				schema: this.schemaAndPolicy,
+				isSummary: true,
+			};
+			summaryChangeCodec.decode(summaryChangeCodec.encode(change, context), context);
+		};
 		this.summarizables = [
 			new EditManagerSummarizer(
 				this.editManager,
@@ -263,6 +288,7 @@ export class SharedTreeCore<
 	}): void {
 		const { stringify, fullTree, telemetryContext, incrementalSummaryContext, builder } =
 			props;
+		this.compactHistoryForSummary();
 		// eslint-disable-next-line import-x/no-deprecated -- Internal implementation use is supported (AB#88250).
 		const summarizableBuilder = new SummaryTreeBuilder();
 		// Merge the summaries of all summarizables together under a single ISummaryTree
@@ -289,10 +315,114 @@ export class SharedTreeCore<
 		builder.addWithStats(summarizablesTreeKey, summarizableBuilder.getSummaryTree());
 	}
 
+	/**
+	 * Configures local summary-time compaction using internal graph commits.
+	 * No policy is enabled by default, persisted, or exposed through SharedTree options.
+	 * Enabling a policy requires minVersionForCollab of 3.14.0 or later.
+	 */
+	@throwIfBroken
+	public setSummaryCompactionPolicy(
+		policy: HistoryCompactionPolicy<TChange> | undefined,
+	): void {
+		if (policy !== undefined) {
+			this.checkCompactionCompatibility();
+		}
+		this.summaryCompactionPolicy = policy;
+	}
+
+	@throwIfBroken
+	private checkCompactionCompatibility(): void {
+		if (
+			minVersionToSharedTreeSummaryFormatVersion(this.coreOptions.minVersionForCollab) <
+			SharedTreeSummaryFormatVersion.v3
+		) {
+			throw new UsageError("History compaction requires minVersionForCollab >= 3.14.0.");
+		}
+	}
+
+	/**
+	 * Compacts retained main-branch history with summary-codec validation and per-pair failure isolation.
+	 * Decision callback errors propagate; engine failures leave the failing pair unchanged.
+	 * Rejects older-compatible configurations before mutation without breaking the tree.
+	 */
+	@throwIfBroken
+	public compactHistory(
+		canCompact: HistoryCompactionPolicy<TChange>,
+		onCommitCompacted?: () => void,
+		stats?: HistoryCompactionStats,
+		onEngineFailure?: (error: unknown) => void,
+	): number {
+		this.checkCompactionCompatibility();
+		return this.breaker.run(() =>
+			this.editManager.compactHistory(canCompact, onCommitCompacted, stats, {
+				isolateFailures: true,
+				onEngineFailure,
+				validateComposedChange: this.validateComposedChange,
+			}),
+		);
+	}
+
+	private compactHistoryForSummary(): void {
+		const policy = this.summaryCompactionPolicy;
+		if (policy === undefined) {
+			return;
+		}
+		const stats = createHistoryCompactionStats();
+		let policyFailed = false;
+		let engineError: unknown;
+		const removedCount = this.compactHistory(
+			(current, target) => {
+				if (policyFailed) {
+					return false;
+				}
+				try {
+					return policy(current, target);
+				} catch {
+					// Catch application errors before they escape a breaker-wrapped method.
+					policyFailed = true;
+					return false;
+				}
+			},
+			undefined,
+			stats,
+			(error) => {
+				engineError ??= error;
+			},
+		);
+		const event = {
+			eventName: "HistoryCompaction",
+			trigger: "summary",
+			status: policyFailed
+				? "failure"
+				: stats.failedPairCount > 0
+					? "partialFailure"
+					: "success",
+			failureSource: policyFailed
+				? "policy"
+				: stats.failedPairCount > 0
+					? "engine"
+					: undefined,
+			removedCount,
+			...stats,
+			failureStage: policyFailed ? "policy" : stats.isolatedFailureStage,
+		};
+		if (policyFailed || stats.failedPairCount > 0) {
+			// Policy errors can contain application data and must not be logged.
+			this.breaker.logger?.sendErrorEvent(event, policyFailed ? undefined : engineError);
+		} else {
+			this.breaker.logger?.sendTelemetryEvent(event);
+		}
+	}
+
 	protected async loadInternal(
 		services: IChannelStorageService,
 		parse: SummaryElementParser,
+		version: SharedTreeSummaryFormatVersion | undefined,
 	): Promise<void> {
+		if (version !== undefined && version >= SharedTreeSummaryFormatVersion.v3) {
+			// A lower-version writer must not re-encode compacted history without its reader guard.
+			this.checkCompactionCompatibility();
+		}
 		// Share a pending load by component identity so dependencies are loaded only once,
 		// even when also reached from the top-level list or another dependent.
 		const loads = new Map<Summarizable, Promise<void>>();
